@@ -1,0 +1,20 @@
+{
+  "name": "finance-boardgame",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Finance boardgame (Cashflow-inspired) — Universal Engine (Go + WASM) + Next.js",
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm --filter web build",
+    "start": "pnpm --filter web start",
+    "build:wasm": "bash tooling/build-wasm.sh",
+    "build:go": "go build ./packages/engine/... ./apps/backend/...",
+    "build:engine": "go build ./packages/engine/...",
+    "build:backend": "go build ./apps/backend/...",
+    "test:go": "go test ./packages/engine/..."
+  },
+  "packageManager": "pnpm@10.30.0",
+  "engines": {
+    "node": ">=20"
+  }
+}
