@@ -6,7 +6,7 @@
 - **ข้อตกลงในการจัดเก็บข้อมูล**:
   - `NOTE.md` -> จดบันทึกสิ่งที่คุยกัน
   - `REQUIREMENT.md` -> เก็บ Requirements ของโปรเจกต์
-  - `AGENTS.md` / `AGENT.md` -> เก็บ Conventions และแนวทางการทำงาน
+  - `AGENTS.md` -> เก็บ Conventions และแนวทางการทำงาน
   - `INFO.md` -> เก็บข้อมูลความรู้ และ Data Reference
 - **หัวข้อเริ่มต้น**: การหารือและวิเคราะห์เกี่ยวกับ **เกม Cashflow** (แนวคิดการเงิน, Game Mechanics, และการนำมาสร้าง Board Game)
 
