@@ -16,9 +16,9 @@
 ### Game Mechanics
 - [ ] **FR-001**: ระบบจำลองงบการเงิน (Income Statement & Balance Sheet)
 - [ ] **FR-002**: วงจร Rat Race (หนูถีบจักร) และ Fast Track (ทางด่วน)
-- [ ] **FR-003**: ระบบคำนวณ Cash Flow (รายได้ − รายจ่าย) และ Passive Income
-- [ ] **FR-004**: ระบบลูกเต๋า (seeded/deterministic เพื่อรองรับ replay และ test)
-- [ ] **FR-005**: ระบบเดินบนกระดาน (Rat Race board + Fast Track board)
+- [x] **FR-003**: ระบบคำนวณ Cash Flow (รายได้ − รายจ่าย) และ Passive Income ✅ finance package + ผูกกับ Payday ใน Slice 1
+- [x] **FR-004**: ระบบลูกเต๋า (seeded/deterministic เพื่อรองรับ replay และ test) ✅ rng + ผูกใน engine.Apply (Slice 1)
+- [ ] **FR-005**: ระบบเดินบนกระดาน (Rat Race board + Fast Track board) 🚧 board/movement/Payday ทำแล้ว (Slice 1); ช่องอื่น + Fast Track รอ Slice 3-5
 - [ ] **FR-006**: ระบบการ์ด (Profession, Small Deal, Big Deal, Doodad, Market, Opportunity)
 - [ ] **FR-007**: เงื่อนไขชนะ — Escape Rat Race (`Passive Income ≥ Total Expenses`) และ Fast Track goal (Dream)
 

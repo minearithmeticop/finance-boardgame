@@ -66,6 +66,15 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 3. **Vertical slice แรก**: อยากได้ playable แบบไหนก่อน (Rat Race loop / lifetime skeleton / systems แยก)?
 4. **จุดจบเกม**: รีวิวชีวิตที่อายุ 80+ ยังไง? คะแนน? บอกเล่า? เปรียบเทียบ?
 
+### ✅ Resolution + Slice 1 (ทำเสร็จ)
+- **Q1 ทิศทางหลัก → "Cashflow core ก่อน"**: สร้าง loop เล่นได้จริงก่อน (สุ่มอาชีพ → Payday → ซื้อขาย asset → หลุดวงหนู) ด้วยรายจ่ายสมจริงขึ้น แล้วค่อยซ้อนระบบ lifetime (อายุ/vitals/ประกัน) ในภายหลัง
+- **Slice 1 — Turn Engine + Payday ✅ ทำเสร็จ** (TDD: Red→Green):
+  - ย้าย `TileType`/`Tile` ไป `domain`; เพิ่ม `ratrace.DefaultBoard()` (24 ช่อง, Payday ที่ index 0)
+  - `engine.Apply(ActionRoll)`: ทอยเต๋า → เดิน → ผ่าน/ตก Payday → รับ Monthly Cash Flow → เปลี่ยนเทิร์น/นับรอบ → emit events
+  - engine.go coverage **93.1%** (7 behavior tests), deterministic (seeded RNG) → replay ได้, มี validation (ถึงตา / เกมจบ)
+  - commits: `72c1d35` (board types), `a9aff02` (turn engine + tests)
+- **ถัดไป — Slice 2**: ข้อมูลอาชีพจริง + ประกันสังคมหัก ณ ที่จ่าย (realism ที่ User ต้องการ)
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
