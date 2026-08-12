@@ -7,8 +7,11 @@ package engine
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/finance-boardgame/engine/domain"
+	"github.com/finance-boardgame/engine/finance"
+	"github.com/finance-boardgame/engine/ratrace"
 	"github.com/finance-boardgame/engine/rng"
 )
 
@@ -21,10 +24,11 @@ type Config struct {
 	Players []domain.Player
 }
 
-// Engine ถือสถานะเกมและ RNG ใช้งานผ่าน New() เท่านั้น
+// Engine ถือสถานะเกม, RNG และกระดาน ใช้งานผ่าน New() เท่านั้น
 type Engine struct {
 	state domain.GameState
 	rng   *rng.RNG
+	board []domain.Tile // กระดานของเฟสปัจจุบัน (เริ่มที่ Rat Race)
 }
 
 // New สร้าง engine ใหม่จาก config (เริ่มเสมอที่ Rat Race, รอบที่ 0)
@@ -41,7 +45,8 @@ func New(cfg Config) *Engine {
 			Round:       0,
 			Seed:        cfg.Seed,
 		},
-		rng: rng.New(cfg.Seed),
+		rng:   rng.New(cfg.Seed),
+		board: ratrace.DefaultBoard(),
 	}
 }
 
@@ -49,12 +54,61 @@ func New(cfg Config) *Engine {
 func (e *Engine) State() domain.GameState { return e.state }
 
 // Apply นำ action มาประมวลผลแล้วคืน events ที่เกิดขึ้น
-//
-// TODO(Session#3): dispatch ไปยัง ratrace/fasttrack ตาม phase ของผู้เล่นที่ส่ง action
 func (e *Engine) Apply(action domain.Action) ([]domain.Event, error) {
 	if e.state.Phase == domain.PhaseEnded {
 		return nil, errors.New("engine: game already ended")
 	}
-	_ = action
-	return nil, nil
+
+	switch action.Type {
+	case domain.ActionRoll:
+		return e.applyRoll(action)
+	default:
+		// TODO(Slice 3+): ActionBuyAsset, ActionSellAsset, ActionPayOffLiability, ...
+		return nil, fmt.Errorf("engine: action type %d not yet supported", action.Type)
+	}
+}
+
+// applyRoll จัดการเทิร์นแบบ roll:
+// ทอยเต๋า → เดิน → resolve ช่องปลายทาง (Payday) → emit events → เปลี่ยนเทิร์น
+//
+// Slice 1: auto-advance หลัง roll (ยังไม่มี decision phase — จะเกิดตอน Opportunity ใน Slice 3)
+func (e *Engine) applyRoll(action domain.Action) ([]domain.Event, error) {
+	current := e.state.CurrentTurn
+	player := &e.state.Players[current]
+
+	// ตรวจว่าเป็นตาของผู้เล่นที่ส่ง action จริงหรือไม่ (คืน error ก่อนทอย → ไม่ทำลาย determinism)
+	if action.PlayerID != player.ID {
+		return nil, fmt.Errorf("engine: not %s's turn (current player is %s)", action.PlayerID, player.ID)
+	}
+
+	startPos := player.Position
+	die := e.rng.RollDice(6)
+	ratrace.MovePlayer(player, die)
+
+	var events []domain.Event
+	events = append(events,
+		domain.Event{Type: domain.EventMoved, PlayerID: player.ID},
+		domain.Event{Type: domain.EventLanded, PlayerID: player.ID},
+	)
+
+	// Payday rule: ผ่าน "หรือ" ตกช่อง Payday (index 0) → ได้ Monthly Cash Flow
+	// เนื่องจาก Payday อยู่ index 0, การ wrap กระดาน (startPos+die >= len) = ผ่าน index 0
+	if startPos+die >= len(e.board) {
+		pay := finance.MonthlyCashFlow(*player)
+		player.Cash += pay
+		events = append(events,
+			domain.Event{Type: domain.EventPayday, PlayerID: player.ID},
+			domain.Event{Type: domain.EventCashChanged, PlayerID: player.ID},
+		)
+	}
+
+	// เปลี่ยนเทิร์น (Round++ เมื่อครบรอบผู้เล่น)
+	next := current + 1
+	if next >= len(e.state.Players) {
+		next = 0
+		e.state.Round++
+	}
+	e.state.CurrentTurn = next
+
+	return events, nil
 }
