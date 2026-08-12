@@ -39,6 +39,26 @@ const (
 	AssetOther
 )
 
+// TileType — ประเภทช่องบนกระดาน (ใช้ร่วมระหว่าง Rat Race และ Fast Track)
+type TileType int
+
+const (
+	TilePayday TileType = iota
+	TileOpportunity
+	TileDoodad
+	TileMarket
+	TileDownsizing
+	TileBaby
+	TileCharity
+	TileBlank
+)
+
+// Tile — ช่องหนึ่งช่องบนกระดาน
+type Tile struct {
+	Type TileType
+	Name string
+}
+
 // Asset — สินทรัพย์ (สิ่งที่นำเงินเข้ากระเป๋า)
 type Asset struct {
 	ID            string
