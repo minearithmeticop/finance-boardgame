@@ -94,6 +94,13 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - **นอกขอบเขต** (ตาม "focus system"): ยังไม่ wire อาชีพจริงเข้า `/play`, ไม่เก็บภาษี passive/portfolio, ไม่มี annual filing event, tax คำนวณตอนสร้างอาชีพ (dynamic = อนาคต)
 - **ถัดไป**: Slice 3 (Opportunity + การ์ดดีล → decision phase) หรือ wire อาชีพจริงเข้า `/play`
 
+### 🔧 Refinement — เงินเดือนสมจริง (อ้างอิงข้อมูลจริง)
+- User สังเกตว่าเงินเดือนเดิมสูงเกินจริง (เช่น พนักงานเสิร์ฟ 15k) → ค้นข้อมูลและปรับ:
+  - แหล่ง: [BOT ค่าจ้างเฉลี่ยจำแนกอาชีพ](https://app.bot.or.th/BTWS_STAT/statistics/BOTWEBSTAT.aspx?reportID=667) ~15,737/เดือน (Q4/2024) · NSO · [กระทรวงแรงงาน ค่าจ้างขั้นต่ำ](https://www.mol.go.th) 337–400/วัน (2568) · ฐานเงินเดือน ก.พ.
+- ปรับลด + ขยายเป็น **14 อาชีพ** (9,000–55,000) ครอบคลุมค่าจ้างต่ำ→มืออาชีพ
+- เขียนแหล่งอ้างอิง + methodology ไว้ใน `INFO.md` § "ข้อมูลรายได้อ้างอิง" (ให้ผู้เล่นตรวจสอบได้)
+- ผล: SS ตอนนี้ scale ตามเงินเดือนจริง (450–750) · ภาษีโผล่เฉพาะรายได้สูง · บทเรียนยังชัด: พนักงานทำความสะอาด (9k) สุทธิ 4,250 > โปรแกรมเมอร์ (35k) สุทธิ 1,830
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
