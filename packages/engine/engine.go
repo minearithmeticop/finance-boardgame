@@ -146,28 +146,26 @@ func (e *Engine) applyRoll(action domain.Action) ([]domain.Event, error) {
 	}
 
 	// Resolve tile ปลายทาง
-	switch e.board[player.Position].Type {
-	case domain.TileOpportunity:
+	tileType := e.board[player.Position].Type
+	if tileType == domain.TileOpportunity {
 		card := cards.DrawDealCard(e.rng)
 		e.state.Pending = &domain.PendingDecision{PlayerID: player.ID, DealCard: card}
 		events = append(events, eventWith(domain.EventLanded, player.ID, map[string]any{
 			"kind": "opportunity", "title": card.Title,
 		}))
 		return events, nil // รอ decision — ห้าม advance turn
-	case domain.TileShopping:
-		dc := cards.DrawDoodadCard(e.rng)
-		player.Cash -= dc.Cost
+	}
+
+	// ทุก life-event tile (News/Windfall/SideJob/Shopping/Family/Donate/Learn/Health/Crisis)
+	// → จั่ว LifeEvent ของหมวดนั้น แล้ว Cash += Amount
+	if cat := tileType.LifeCategory(); cat != "" {
+		ev := cards.DrawLifeEvent(e.rng, cat)
+		player.Cash += ev.Amount
 		events = append(events, eventWith(domain.EventCashChanged, player.ID, map[string]any{
-			"kind": "shopping", "title": dc.Title, "amount": int64(-dc.Cost),
+			"kind": ev.Category, "title": ev.Title, "amount": int64(ev.Amount),
 		}))
-	case domain.TileCrisis:
-		cc := cards.DrawCrisisCard(e.rng)
-		player.Cash -= cc.Amount
-		events = append(events, eventWith(domain.EventCashChanged, player.ID, map[string]any{
-			"kind": "crisis", "title": cc.Title, "amount": int64(-cc.Amount),
-		}))
-	default:
-		// Market/Baby/Charity/Downsizing/Blank — Slice 4
+	} else {
+		// Payday tile (index 0) หรือ tile สำรอง — no-op
 		events = append(events, eventWith(domain.EventLanded, player.ID, map[string]any{
 			"kind": "noop", "tile": e.board[player.Position].Name,
 		}))
