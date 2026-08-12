@@ -117,6 +117,18 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - ⚠️ **ข้อสังเกตจาก smoke test (ความสมจริง)**: เงินเริ่มต้น (Savings 300–8,000) ต่ำกว่าดาวน์ต่ำสุด (5,000) → ผู้เล่น**ซื้อสินทรัพย์ไม่ได้ตั้งแต่ต้น** ต้องออมสะสมหลาย payday ก่อน — เป็น teaching point ที่ดี ("ยังไม่ออม ลงทุนไม่ได้") **แต่ทำให้ demo ยากที่จะโชว์การซื้อ** → **ควรปรับ starting cash สูงขึ้น** หรือเพิ่มเงินเริ่มต้น (ไว้คุย Slice ถัดไป)
 - นอกขอบเขต: Market/Baby/Charity/Downsizing resolution (Slice 4) · ขายสินทรัพย์/จ่ายหนี้ · ประกันลดความเสียหาย Crisis
 
+### 🛠 Slice 4 — Board Rebalance + Expanded Life Events + Content Variety ✅ ทำเสร็จ + browser smoke ผ่าน
+- **แก้ "เล่นยังไงก็ติดลบ"**:
+  - **Starting cash ต่างกันตามอาชีพ** 15,000–60,000 (แก้ค่า Savings แต่ละอาชีพ — สะท้อนต้นทุน/สถานะ เช่น โปรแกรมเมอร์ 40k ต่ำกว่าวิศวกร 45k ทั้งที่เงินเดือนสูงกว่า = lifestyle inflation)
+  - **Crisis 1 ช่อง/รอบ** (จาก 4) · Shopping ยอดลด (ส่วนใหญ่ 500–5,000) · Crisis 5,000–30,000 (รอดตั้งต้น)
+  - เพิ่ม **Windfall + SideJob** (บวก) ชดเชย → board สมดุล บวก/โอกาส 12 vs ลบ 5
+- **board ใหม่ (24 ช่อง)**: Payday 1 · Opportunity 7 · News 3 · Windfall 3 · SideJob 2 · Shopping 3 · Family 1 · Donate 1 · Learn 1 · Health 1 · Crisis 1
+- **LifeEvent (unified)** — แทน DoodadCard/CrisisCard: `LifeEvent{Category, Title, Detail, Amount}` resolve = `Cash += Amount` · ครอบทุก life-event tile · per-category decks (News 15 / Windfall 10 / SideJob 8 / Shopping 10 / Crisis 8 / Family 6 / Donate 5 / Learn 6 / Health 6 — เนื้อหาเยอะ ไม่ซ้ำจนเบื่อ)
+- **DealCards ขยายเป็น 12** — หุ้น/อสังหาฯ/ธุรกิจ + **เครือข่ายพันธมิตร (ธุรกิจเครือข่าย/Affiliate)** สอนแนวคิดธุรกิจเครือข่ายแบบทั่วไป
+- ⚠️ **ข้อตกลงเข้ม (ตาม User)**: **ห้ามเขียนชื่อแบรนด์ธุรกิจเครือข่ายใดๆ ลง git** — ใช้คำทั่วไป "เครือข่ายพันธมิตร / ธุรกิจเครือข่าย / Affiliate" เท่านั้น (ไม่มีชื่อแบรนด์ในโค้ด/NOTE ใดๆ)
+- **browser smoke ผ่าน**: เล่น 30 ทอย → ทั้งสองผู้เล่น **ไม่ติดลบ** (แม่ค้า 20k→40k, ออฟฟิศ 25k→28.6k) + event หลากหลาย (news/windfall/sidejob/shopping/donate/payday/opportunity) + เริ่มเงินต่างกัน
+- นอกขอบเขต: News กระทบ market values (flavor ก่อน) · Learn/Health ให้ stat · ประกันลด Crisis
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
