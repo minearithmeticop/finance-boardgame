@@ -108,6 +108,15 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - glossary: เพิ่ม `Crisis` + เปลี่ยน `Doodad→Shopping`
 - ⚠️ หมายเหตุ: ตอนนี้เป็นแค่ "tile types + taxonomy" — **resolution logic** (การ์ดดีล / เหตุการณ์จริงตอนตกช่อง) จะทำใน **Slice 3**
 
+### 🛠 Slice 3 — Event/Card Resolution + Decision Phase ✅ ทำเสร็จ + browser smoke ผ่าน
+- **`cards` package** (ใหม่): DealCard/DoodadCard/CrisisCard decks + `Draw*` (8/8/7 ใบ) — ผสมดีลดี/แยก สอนประเมินดีล (เช่น "บ้านเก่าเช่าถูก" net −700/เดือน)
+- **Decision phase**: `GameState.Pending` + `ActionDecline` + `Event.Data` (payload แก้ TODO เก่า)
+- **engine**: `applyRoll` resolve tile — 🃏 Opportunity → ตั้ง Pending รอ decision · 🛍️ Shopping → หักเงิน · ⚠️ Crisis → หักเงิน · อื่นๆ noop (Slice 4) + `applyBuyAsset` (เพิ่ม Asset/Liability + หักดาวน์ + เช็คเงินพอ) + `applyDecline`
+- **/play**: Opportunity **modal** (รายละเอียดดีล + สุทธิ/เดือน + ซื้อ/ผ่าน, ปุ่มซื้อ disabled ถ้าเงินไม่พอ) + event log อ่านจาก `event.Data`
+- **browser smoke ผ่าน**: วงจรเต็ม 60 รอบ — roll/Opportunity(decline)/Shopping/Crisis/Payday ครบ ไม่ error · affordability guard ทำงาน
+- ⚠️ **ข้อสังเกตจาก smoke test (ความสมจริง)**: เงินเริ่มต้น (Savings 300–8,000) ต่ำกว่าดาวน์ต่ำสุด (5,000) → ผู้เล่น**ซื้อสินทรัพย์ไม่ได้ตั้งแต่ต้น** ต้องออมสะสมหลาย payday ก่อน — เป็น teaching point ที่ดี ("ยังไม่ออม ลงทุนไม่ได้") **แต่ทำให้ demo ยากที่จะโชว์การซื้อ** → **ควรปรับ starting cash สูงขึ้น** หรือเพิ่มเงินเริ่มต้น (ไว้คุย Slice ถัดไป)
+- นอกขอบเขต: Market/Baby/Charity/Downsizing resolution (Slice 4) · ขายสินทรัพย์/จ่ายหนี้ · ประกันลดความเสียหาย Crisis
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
