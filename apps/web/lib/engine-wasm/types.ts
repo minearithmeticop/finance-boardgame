@@ -23,6 +23,7 @@ export interface Player {
   Profession: Profession;
   Assets: Asset[];
   Liabilities: Liability[];
+  Loans: Loan[];
   Position: number;
   OnFastTrack: boolean;
   Bankrupt: boolean;
@@ -46,6 +47,19 @@ export interface Liability {
   Name: string;
   Payment: number;
   Balance: number;
+}
+
+export interface Loan {
+  ID: string;
+  Lender: string; // "personal" | "secured" | "informal"
+  Principal: number;
+  RateYear: number;
+  TermMonths: number;
+  MonthlyPay: number;
+  Balance: number;
+  Collateral: string;
+  CollatKind: string;
+  CollatRef: string;
 }
 
 export interface Asset {

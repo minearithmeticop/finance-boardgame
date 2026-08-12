@@ -115,6 +115,11 @@ export default function PlayPage() {
   const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [loanOpen, setLoanOpen] = useState(false);
+  const [loanType, setLoanType] = useState('personal');
+  const [loanAmount, setLoanAmount] = useState('');
+  const [collatSel, setCollatSel] = useState('home');
+  const [loanMsg, setLoanMsg] = useState('');
   const logId = useRef(0);
 
   useEffect(() => {
@@ -205,6 +210,44 @@ export default function PlayPage() {
   const handleBuy = () => resolvePending(ActionType.BuyAsset, '🏠 ซื้อ', true);
   const handleDecline = () => resolvePending(ActionType.Decline, '⏭️ ผ่าน', false);
 
+  function handleTakeLoan() {
+    if (!state) return;
+    const cur = state.Players[state.CurrentTurn];
+    try {
+      const payload: Record<string, unknown> = { lender: loanType, amount: Number(loanAmount) };
+      if (loanType === 'secured') {
+        if (collatSel === 'home' || collatSel === 'car') {
+          payload.collateralKind = collatSel;
+        } else {
+          payload.collateralKind = 'asset';
+          payload.collateralRef = collatSel;
+        }
+      }
+      applyAction({ PlayerID: cur.ID, Type: ActionType.TakeLoan, Payload: payload });
+      const next = getGameState();
+      setState(next);
+      setStatements(fetchStatements(next.Players.length));
+      setLoanMsg(`✅ อนุมัติ! ได้รับ ${Number(loanAmount).toLocaleString()} บาท`);
+      setLoanAmount('');
+    } catch (e) {
+      setLoanMsg(`❌ ${(e as Error).message}`);
+    }
+  }
+
+  function handlePayOffLoan(loanID: string) {
+    if (!state) return;
+    const cur = state.Players[state.CurrentTurn];
+    try {
+      applyAction({ PlayerID: cur.ID, Type: ActionType.PayOffLiability, Payload: { loanID } });
+      const next = getGameState();
+      setState(next);
+      setStatements(fetchStatements(next.Players.length));
+      setLoanMsg('✅ ปิดสินเชื่อแล้ว');
+    } catch (e) {
+      setLoanMsg(`❌ ${(e as Error).message}`);
+    }
+  }
+
   const current = state ? state.Players[state.CurrentTurn] : null;
   const currentStmt = state ? statements[state.CurrentTurn] : undefined;
   const pending = state?.Pending ?? null;
@@ -269,6 +312,13 @@ export default function PlayPage() {
                   {busy ? '…' : '🎲 ทอยเต๋า'}
                 </button>
               )}
+              <button
+                onClick={() => { setLoanOpen(true); setLoanMsg(''); }}
+                disabled={busy}
+                className="text-xs text-sky-300 transition hover:text-sky-200 disabled:opacity-40"
+              >
+                💳 สินเชื่อ
+              </button>
               <button
                 onClick={startNewGame}
                 disabled={busy}
@@ -356,6 +406,109 @@ export default function PlayPage() {
           </section>
         </aside>
       </div>
+
+      {/* ── Loan modal ── */}
+      {loanOpen && state && (() => {
+        const cur = state.Players[state.CurrentTurn];
+        const collatOpts: { sel: string; label: string; value: number }[] = [];
+        if (cur.Profession.HomeMortgage.Balance > 0)
+          collatOpts.push({ sel: 'home', label: `ค้ำบ้าน (${cur.Profession.HomeMortgage.Balance.toLocaleString()})`, value: cur.Profession.HomeMortgage.Balance });
+        if (cur.Profession.CarLoan.Balance > 0)
+          collatOpts.push({ sel: 'car', label: `ค้ำรถ (${cur.Profession.CarLoan.Balance.toLocaleString()})`, value: cur.Profession.CarLoan.Balance });
+        cur.Assets.forEach((a) => collatOpts.push({ sel: a.ID, label: `ค้ำ ${a.Name} (${a.Cost.toLocaleString()})`, value: a.Cost }));
+        const selOpt = collatOpts.find((o) => o.sel === collatSel) ?? collatOpts[0];
+        const maxLoan = selOpt ? Math.floor(selOpt.value * 0.7) : 0;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg border border-sky-500/50 bg-slate-900 p-5 shadow-xl">
+              <div className="mb-1 flex items-center justify-between">
+                <h3 className="text-lg font-bold text-slate-100">💳 สินเชื่อ — {cur.Name}</h3>
+                <button onClick={() => setLoanOpen(false)} className="text-slate-500 hover:text-slate-300">✕</button>
+              </div>
+              <p className="mb-3 text-xs text-slate-400">เงินสด {cur.Cash.toLocaleString()} · สินเชื่อ {cur.Loans.length} บัญชี</p>
+              <div className="mb-3 grid grid-cols-3 gap-2 text-center text-xs">
+                {[
+                  { id: 'personal', l: 'ส่วนบุคคล', r: '24%/ปี' },
+                  { id: 'secured', l: 'ค้ำหลัก', r: '7%/ปี' },
+                  { id: 'informal', l: 'นอกระบบ', r: '10%/ด!' },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => { setLoanType(t.id); setLoanMsg(''); }}
+                    className={`rounded border p-2 ${loanType === t.id ? 'border-sky-500 bg-sky-500/20 text-sky-300' : 'border-slate-700 text-slate-400'}`}
+                  >
+                    <div className="font-semibold">{t.l}</div>
+                    <div className="text-[10px]">{t.r}</div>
+                  </button>
+                ))}
+              </div>
+              {loanType === 'informal' && (
+                <p className="mb-2 rounded bg-red-500/15 p-2 text-xs text-red-300">⚠️ ดอกเบี้ย 10%/เดือน (120%/ปี) — กับดักหนี้สิน ใช้เป็นทางสุดท้าย!</p>
+              )}
+              {loanType === 'secured' && (
+                <div className="mb-2">
+                  {collatOpts.length === 0 ? (
+                    <p className="text-xs text-rose-400">ไม่มีหลักค้ำ (ต้องมีบ้าน/รถ/สินทรัพย์)</p>
+                  ) : (
+                    <>
+                      <label className="text-xs text-slate-400">หลักค้ำ (สูงสุด {maxLoan.toLocaleString()}):</label>
+                      <select
+                        value={collatSel}
+                        onChange={(e) => setCollatSel(e.target.value)}
+                        className="mt-1 w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-200"
+                      >
+                        {collatOpts.map((o) => (
+                          <option key={o.sel} value={o.sel}>{o.label}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                </div>
+              )}
+              <div className="mb-2 flex gap-2">
+                <input
+                  type="number"
+                  value={loanAmount}
+                  onChange={(e) => setLoanAmount(e.target.value)}
+                  placeholder="วงเงินที่ต้องการ"
+                  className="flex-1 rounded border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+                />
+                <button
+                  onClick={handleTakeLoan}
+                  disabled={busy || !loanAmount}
+                  className="rounded bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-40"
+                >
+                  ขอสินเชื่อ
+                </button>
+              </div>
+              {loanMsg && <p className="mb-2 text-xs text-slate-300">{loanMsg}</p>}
+              {cur.Loans.length > 0 && (
+                <div className="mt-3 border-t border-slate-700 pt-3">
+                  <div className="mb-2 text-xs font-semibold text-slate-400">สินเชื่อที่มี</div>
+                  <ul className="space-y-2">
+                    {cur.Loans.map((ln) => (
+                      <li key={ln.ID} className="flex items-center justify-between rounded bg-slate-800/60 p-2 text-xs">
+                        <span>
+                          <b className="text-slate-200">{ln.Lender}</b>
+                          {ln.Collateral && <span className="text-slate-500"> ({ln.Collateral})</span>}
+                          <span className="ml-2 text-slate-400">ค่างวด {ln.MonthlyPay.toLocaleString()}/ด · คงค้าง {ln.Balance.toLocaleString()}</span>
+                        </span>
+                        <button
+                          onClick={() => handlePayOffLoan(ln.ID)}
+                          disabled={cur.Cash < ln.Balance || busy}
+                          className="rounded bg-rose-600 px-2 py-1 text-white hover:bg-rose-500 disabled:opacity-40"
+                        >
+                          ปิด {ln.Balance.toLocaleString()}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Opportunity decision modal ── */}
       {pending && (
