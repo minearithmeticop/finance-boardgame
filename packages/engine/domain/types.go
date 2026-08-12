@@ -84,6 +84,37 @@ type Liability struct {
 	Balance Money // เงินต้นคงเหลือ
 }
 
+// DealCard — การ์ดดีลจากช่อง Opportunity (เสนอให้ซื้อสินทรัพย์)
+type DealCard struct {
+	Title       string
+	AssetType   AssetType
+	DownPayment Money // เงินดาวน์ที่ต้องจ่ายตอนซื้อ
+	Cost        Money // ราคาเต็มของสินทรัพย์
+	CashFlow    Money // รายได้ต่อเดือนที่สินทรัพย์นี้จะสร้าง
+	LoanPayment Money // ค่าผ่อนหนี้ต่อเดือน (ถ้ากู้ = Cost − DownPayment)
+}
+
+// NetCashFlow คืนผลกระทบต่อเงินสดสุทธิ/เดือน ถ้าซื้อดีลนี้ (CashFlow − LoanPayment)
+func (c DealCard) NetCashFlow() Money { return c.CashFlow - c.LoanPayment }
+
+// DoodadCard — การ์ดจากช่อง Shopping (ใช้จ่ายฟุ่มเฟือย)
+type DoodadCard struct {
+	Title string
+	Cost  Money
+}
+
+// CrisisCard — การ์ดจากช่อง Crisis (เหตุการณ์ร้าย)
+type CrisisCard struct {
+	Title  string
+	Amount Money // ความเสียหาย (เงินที่หายไป)
+}
+
+// PendingDecision — ดีลที่กำลังรอผู้เล่นตัดสินใจ (ซื้อ/ผ่าน) หลังตกช่อง Opportunity
+type PendingDecision struct {
+	PlayerID string
+	DealCard DealCard
+}
+
 // Profession — อาชีพเริ่มต้น กำหนดเงินเดือนและรายจ่าย/หนี้สินพื้นฐาน
 type Profession struct {
 	Name           string
@@ -136,9 +167,10 @@ type FinancialStatement struct {
 type GameState struct {
 	Phase       Phase
 	Players     []Player
-	CurrentTurn int   // index ของผู้เล่นที่กำลังเล่น
-	Round       int   // รอบที่เท่าไหร่
-	Seed        int64 // seed ของ RNG (เพื่อ replay)
+	CurrentTurn int              // index ของผู้เล่นที่กำลังเล่น
+	Round       int              // รอบที่เท่าไหร่
+	Seed        int64            // seed ของ RNG (เพื่อ replay)
+	Pending     *PendingDecision // ดีลที่รอตัดสินใจ (ไม่ nil = เกมจอดอยู่ที่ decision phase)
 }
 
 // ActionType — ประเภทคำสั่งที่ผู้เล่นส่งเข้า engine (command)
@@ -151,6 +183,7 @@ const (
 	ActionPayOffLiability
 	ActionTakeLoan
 	ActionEndTurn
+	ActionDecline // ผ่านดีลที่กำลังตัดสินใจ (resolve PendingDecision)
 )
 
 // Action — คำสั่งที่ส่งเข้า engine
@@ -179,5 +212,6 @@ const (
 type Event struct {
 	Type     EventType
 	PlayerID string
-	// TODO(Session#3): typed payload
+	// Data คือ payload ยืดหยุ่น (เช่น {title, amount} ของการ์ด) — UI ใช้แสดงเรื่องราว
+	Data map[string]any
 }
