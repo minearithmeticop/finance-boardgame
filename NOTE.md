@@ -129,6 +129,16 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - **browser smoke ผ่าน**: เล่น 30 ทอย → ทั้งสองผู้เล่น **ไม่ติดลบ** (แม่ค้า 20k→40k, ออฟฟิศ 25k→28.6k) + event หลากหลาย (news/windfall/sidejob/shopping/donate/payday/opportunity) + เริ่มเงินต่างกัน
 - นอกขอบเขต: News กระทบ market values (flavor ก่อน) · Learn/Health ให้ stat · ประกันลด Crisis
 
+### 🛠 Slice 5 — ระบบสินเชื่อที่สมจริง (Bank + Collateral + Informal) ✅ ทำเสร็จ + tests ผ่าน
+- **`loan` package** (ใหม่): `Request()` ประเมินคุณสมบัติผู้กู้แบบสมจริง + `ComputeLoan` + `CollateralValue/InUse`
+- **3 ประเภทสินเชื่อ**: ส่วนบุคคล (24%/ปี, ≤5×เงินเดือน, DSCR≤50%) · ค้ำหลักทรัพย์ (7%/ปี, LTV 70%, ต้องมีหลักค้ำ) · นอกระบบ (120%/ปี = 10%/เดือน!, ไม่มีเงื่อนไข — กับดัก)
+- **หลักค้ำ**: ค้ำบ้าน (HomeMortgage.Balance) · ค้ำรถ (CarLoan.Balance) · ค้ำทรัพย์สิน (owned Asset.Cost) — ห้ามใช้ซ้ำจนกว่าจะปิด
+- **DSCR**: หนี้เกิน 50% ของรายได้ → ธนาคาร **ปฏิเสธ** (สมจริง!)
+- **engine**: `applyTakeLoan` (ขอกู้ → ประเมิน → อนุมัติ/ปฏิเสธ) + `applyPayOffLoan` (ปิด lump-sum) — ใช้ได้ตลอดเทิร์น แม้ตอน Pending (กู้เพื่อซื้อดีล)
+- **finance**: รวม loan.MonthlyPay → Expenses + loan.Balance → Liabilities + helper DebtService/TotalIncome
+- **UI /play**: modal "💳 สินเชื่อ" (เลือกประเภท + หลักค้ำ + วงเงิน + ขอสินเชื่อ + รายการสินเชื่อ + ปิด) + ป้ายเตือนนอกระบบ
+- นอกขอบเขต: amortization รายเดือนเต็ม (ใช้ flat + lump-sum) · เครดิตบูโร/blacklist · ดอกเบี้ยทบต้น
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
