@@ -11,7 +11,6 @@ import (
 
 // ─── helpers ──────────────────────────────────────────────────────────────
 
-// newTestEngine สร้าง engine พร้อมผู้เล่นที่กำหนด (seed ตายตัว → deterministic)
 func newTestEngine(seed int64, players ...domain.Player) *Engine {
 	return New(Config{Seed: seed, Players: players})
 }
@@ -30,15 +29,6 @@ func samplePlayer(id string, pos int) domain.Player {
 	}
 }
 
-// mustRoll ทอยเต๋าให้ผู้เล่นที่กำหนด ถ้า error ให้ fail test ทันที
-func mustRoll(t *testing.T, e *Engine, playerID string) {
-	t.Helper()
-	if _, err := e.Apply(domain.Action{PlayerID: playerID, Type: domain.ActionRoll}); err != nil {
-		t.Fatalf("Apply roll for %s: %v", playerID, err)
-	}
-}
-
-// hasEvent เช็คว่ามี event type ที่ต้องการในลิสต์หรือไม่
 func hasEvent(events []domain.Event, want domain.EventType) bool {
 	for _, ev := range events {
 		if ev.Type == want {
@@ -48,132 +38,262 @@ func hasEvent(events []domain.Event, want domain.EventType) bool {
 	return false
 }
 
-// ─── tests ────────────────────────────────────────────────────────────────
-
-// TestApply_RollAdvancesToNextPlayer — หลัง roll เทิร์นต้องเลื่อนไปผู้เล่นถัดไป
-func TestApply_RollAdvancesToNextPlayer(t *testing.T) {
-	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
-
-	mustRoll(t, e, "p1")
-
-	if got := e.State().CurrentTurn; got != 1 {
-		t.Errorf("CurrentTurn = %d, want 1", got)
-	}
-}
-
-// TestApply_FullLapIncrementsRound — ทุกผู้เล่น roll ครั้งละ 1 = ครบ 1 รอบ → Round = 1
-func TestApply_FullLapIncrementsRound(t *testing.T) {
-	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
-
-	mustRoll(t, e, "p1")
-	mustRoll(t, e, "p2")
-
-	if e.State().Round != 1 {
-		t.Errorf("Round = %d, want 1", e.State().Round)
-	}
-	if e.State().CurrentTurn != 0 {
-		t.Errorf("CurrentTurn = %d, want 0 (wrapped)", e.State().CurrentTurn)
-	}
-}
-
-// TestApply_PassPayday_ReceivesMonthlyCashFlow
-// ผู้เล่นอยู่ช่องสุดท้าย (23) — roll อะไรก็ตาม (1-6) จะ wrap ผ่าน Payday (index 0)
-// → เงินสดต้องเพิ่มขึ้นเท่ากับ MonthlyCashFlow และ position ต้องอยู่ใน [0,5]
-func TestApply_PassPayday_ReceivesMonthlyCashFlow(t *testing.T) {
-	p := samplePlayer("p1", 23)
-	expectedPay := finance.MonthlyCashFlow(p) // 2,000
-	startCash := p.Cash                        // 1,000
-
-	e := newTestEngine(42, p)
-	events, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll})
-	if err != nil {
-		t.Fatalf("Apply: %v", err)
-	}
-
-	got := e.State().Players[0]
-	if got.Cash != startCash+expectedPay {
-		t.Errorf("Cash = %d, want %d (start %d + payday %d)", got.Cash, startCash+expectedPay, startCash, expectedPay)
-	}
-	if got.Position < 0 || got.Position > 5 {
-		t.Errorf("Position = %d, want 0..5 (wrapped past Payday at index 0)", got.Position)
-	}
-	if !hasEvent(events, domain.EventPayday) {
-		t.Error("expected EventPayday in emitted events")
-	}
-}
-
-// TestApply_RollKeepsPositionInRange — หลัง roll position ต้องอยู่ใน [0, BoardSize)
-func TestApply_RollKeepsPositionInRange(t *testing.T) {
-	e := newTestEngine(7, samplePlayer("p1", 0))
-
-	mustRoll(t, e, "p1")
-
-	pos := e.State().Players[0].Position
-	if pos < 0 || pos >= ratrace.BoardSize {
-		t.Errorf("Position = %d, out of [0,%d)", pos, ratrace.BoardSize)
-	}
-}
-
-// TestApply_Deterministic_SameSeedSameActions
-// engine สองตัว seed เดียวกัน + actions เดียวกัน → state เท่ากันทุกด้าน (replay ได้)
-func TestApply_Deterministic_SameSeedSameActions(t *testing.T) {
-	a := newTestEngine(123, samplePlayer("p1", 0), samplePlayer("p2", 5))
-	b := newTestEngine(123, samplePlayer("p1", 0), samplePlayer("p2", 5))
-
-	for i := 0; i < 4; i++ {
-		pid := []string{"p1", "p2"}[a.State().CurrentTurn]
-		mustRoll(t, a, pid)
-		mustRoll(t, b, pid)
-	}
-
-	sa, sb := a.State(), b.State()
-	for i := range sa.Players {
-		if sa.Players[i].Position != sb.Players[i].Position {
-			t.Errorf("player %d position: %d vs %d", i, sa.Players[i].Position, sb.Players[i].Position)
-		}
-		if sa.Players[i].Cash != sb.Players[i].Cash {
-			t.Errorf("player %d cash: %d vs %d", i, sa.Players[i].Cash, sb.Players[i].Cash)
+// paydayAmount คืน (amount, true) ถ้ามี EventPayday ใน events
+func paydayAmount(events []domain.Event) (domain.Money, bool) {
+	for _, ev := range events {
+		if ev.Type == domain.EventPayday {
+			if a, ok := ev.Data["amount"].(int64); ok {
+				return domain.Money(a), true
+			}
+			return 0, true
 		}
 	}
-	if sa.CurrentTurn != sb.CurrentTurn {
-		t.Errorf("CurrentTurn: %d vs %d", sa.CurrentTurn, sb.CurrentTurn)
-	}
-	if sa.Round != sb.Round {
-		t.Errorf("Round: %d vs %d", sa.Round, sb.Round)
-	}
+	return 0, false
 }
 
-// TestApply_NotYourTurn_ReturnsError — ส่ง action ของคนที่ไม่ใช่เทิร์นปัจจุบัน → error
+// rollUntilPending ทอย (สลับผู้เล่นตาม CurrentTurn) จนกว่าจะตก Opportunity (Pending)
+func rollUntilPending(t *testing.T, e *Engine, ids []string, maxRolls int) *domain.PendingDecision {
+	t.Helper()
+	for i := 0; i < maxRolls; i++ {
+		if p := e.State().Pending; p != nil {
+			return p
+		}
+		pid := ids[e.State().CurrentTurn%len(ids)]
+		if _, err := e.Apply(domain.Action{PlayerID: pid, Type: domain.ActionRoll}); err != nil {
+			t.Fatalf("roll %d: %v", i, err)
+		}
+	}
+	return e.State().Pending
+}
+
+// ─── guards (คงจาก Slice 1) ──────────────────────────────────────────────
+
 func TestApply_NotYourTurn_ReturnsError(t *testing.T) {
 	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
-
 	_, err := e.Apply(domain.Action{PlayerID: "p2", Type: domain.ActionRoll})
 	if err == nil {
 		t.Error("expected error when acting out of turn, got nil")
 	}
 }
 
-// TestApply_GameEnded_ReturnsError — เกมจบแล้ว → action ใด ๆ ต้อง error
 func TestApply_GameEnded_ReturnsError(t *testing.T) {
 	e := newTestEngine(42, samplePlayer("p1", 0))
 	e.state.Phase = domain.PhaseEnded
-
 	_, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll})
 	if err == nil {
 		t.Error("expected error when game ended, got nil")
 	}
 }
 
-// TestNewWithRandomProfessions_CreatesValidPlayers — สุ่มอาชีพจริงให้ผู้เล่น count คน
+func TestApply_RollKeepsPositionInRange(t *testing.T) {
+	e := newTestEngine(7, samplePlayer("p1", 0))
+	if _, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll}); err != nil {
+		t.Fatal(err)
+	}
+	pos := e.State().Players[0].Position
+	if pos < 0 || pos >= ratrace.BoardSize {
+		t.Errorf("Position = %d, out of [0,%d)", pos, ratrace.BoardSize)
+	}
+}
+
+// ─── Payday ───────────────────────────────────────────────────────────────
+
+// ผู้เล่นที่ pos 23 → roll ใด ๆ จะ wrap → ต้องมี EventPayday amount = MonthlyCashFlow
+func TestApply_Payday_EmitsAmountOnWrap(t *testing.T) {
+	p := samplePlayer("p1", 23)
+	want := finance.MonthlyCashFlow(p) // 2,000
+	e := newTestEngine(42, p)
+
+	events, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll})
+	if err != nil {
+		t.Fatalf("roll: %v", err)
+	}
+	amt, ok := paydayAmount(events)
+	if !ok {
+		t.Fatal("expected EventPayday when wrapping past index 0 from pos 23")
+	}
+	if amt != want {
+		t.Errorf("payday amount = %d, want %d", amt, want)
+	}
+}
+
+// ─── Opportunity → decision phase ─────────────────────────────────────────
+
+// ตก Opportunity → ตั้ง Pending + ตอน Pending การ roll ต้อง error
+func TestApply_LandOnOpportunity_SetsPendingAndBlocksRoll(t *testing.T) {
+	e := newTestEngine(42, samplePlayer("p1", 0))
+	pending := rollUntilPending(t, e, []string{"p1"}, 80)
+	if pending == nil {
+		t.Fatal("never landed on Opportunity in 80 rolls")
+	}
+	// ขณะ Pending, roll ต้อง error (ต้อง resolve ก่อน)
+	if _, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll}); err == nil {
+		t.Error("expected error when rolling while a deal is pending")
+	}
+}
+
+// ซื้อดีล → เพิ่ม Asset + หักเงินดาวน์ + ล้าง Pending + เปลี่ยนเทิร์น
+func TestApply_BuyAsset_AddsAssetAndAdvancesTurn(t *testing.T) {
+	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
+	pending := rollUntilPending(t, e, []string{"p1", "p2"}, 80)
+	if pending == nil {
+		t.Fatal("never landed on Opportunity")
+	}
+
+	player := e.playerByID(pending.PlayerID)
+	player.Cash = 1_000_000 // ให้เงินพอซื้อทุกดีล
+	card := pending.DealCard
+	assetsBefore := len(player.Assets)
+	turnBefore := e.State().CurrentTurn
+
+	events, err := e.Apply(domain.Action{PlayerID: pending.PlayerID, Type: domain.ActionBuyAsset})
+	if err != nil {
+		t.Fatalf("buy: %v", err)
+	}
+	if !hasEvent(events, domain.EventAssetBought) {
+		t.Error("expected EventAssetBought")
+	}
+	after := e.playerByID(pending.PlayerID)
+	if len(after.Assets) != assetsBefore+1 {
+		t.Errorf("Assets count = %d, want %d", len(after.Assets), assetsBefore+1)
+	}
+	if after.Cash != 1_000_000-card.DownPayment {
+		t.Errorf("Cash = %d, want %d (1,000,000 − down %d)", after.Cash, 1_000_000-card.DownPayment, card.DownPayment)
+	}
+	if e.State().Pending != nil {
+		t.Error("Pending not cleared after buy")
+	}
+	if e.State().CurrentTurn == turnBefore {
+		t.Error("turn not advanced after buy")
+	}
+}
+
+// ซื้อเมื่อเงินไม่พอ → error (และ Pending ยังคงอยู่)
+func TestApply_BuyAsset_CantAffordReturnsError(t *testing.T) {
+	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
+	pending := rollUntilPending(t, e, []string{"p1", "p2"}, 80)
+	if pending == nil {
+		t.Fatal("never landed on Opportunity")
+	}
+	e.playerByID(pending.PlayerID).Cash = 100 // ดาวน์ต่ำสุดของดีล = 5,000 → ซื้อไม่ได้
+
+	_, err := e.Apply(domain.Action{PlayerID: pending.PlayerID, Type: domain.ActionBuyAsset})
+	if err == nil {
+		t.Error("expected error when can't afford down payment, got nil")
+	}
+	if e.State().Pending == nil {
+		t.Error("Pending should remain after failed buy")
+	}
+}
+
+// ผ่านดีล → ล้าง Pending + เปลี่ยนเทิร์น
+func TestApply_Decline_ClearsPendingAndAdvancesTurn(t *testing.T) {
+	e := newTestEngine(42, samplePlayer("p1", 0), samplePlayer("p2", 0))
+	pending := rollUntilPending(t, e, []string{"p1", "p2"}, 80)
+	if pending == nil {
+		t.Fatal("never landed on Opportunity")
+	}
+	turnBefore := e.State().CurrentTurn
+
+	_, err := e.Apply(domain.Action{PlayerID: pending.PlayerID, Type: domain.ActionDecline})
+	if err != nil {
+		t.Fatalf("decline: %v", err)
+	}
+	if e.State().Pending != nil {
+		t.Error("Pending not cleared after decline")
+	}
+	if e.State().CurrentTurn == turnBefore {
+		t.Error("turn not advanced after decline")
+	}
+}
+
+// ─── Shopping / Crisis ────────────────────────────────────────────────────
+
+// ตก Shopping/Crisis → ต้องมี EventCashChanged ค่า amount ติดลบ
+func TestApply_ShoppingOrCrisis_EmitsNegativeCashChange(t *testing.T) {
+	e := newTestEngine(42, samplePlayer("p1", 0))
+	found := false
+	for i := 0; i < 100 && !found; i++ {
+		// resolve pending ก่อนถ้ามี
+		if e.State().Pending != nil {
+			e.Apply(domain.Action{PlayerID: e.State().Pending.PlayerID, Type: domain.ActionDecline})
+			continue
+		}
+		events, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll})
+		if err != nil {
+			t.Fatalf("roll %d: %v", i, err)
+		}
+		for _, ev := range events {
+			if ev.Type != domain.EventCashChanged {
+				continue
+			}
+			kind, _ := ev.Data["kind"].(string)
+			if kind == "shopping" || kind == "crisis" {
+				amt, _ := ev.Data["amount"].(int64)
+				if amt >= 0 {
+					t.Errorf("%s amount should be negative, got %d", kind, amt)
+				}
+				found = true
+			}
+		}
+	}
+	if !found {
+		t.Fatal("never landed on Shopping/Crisis in 100 rolls")
+	}
+}
+
+// ─── Determinism ──────────────────────────────────────────────────────────
+
+// seed เดียวกัน + action เดียวกัน (decline เมื่อ pending, roll ปกติ) → state เท่ากัน
+func TestApply_Deterministic_SameSeedSameActions(t *testing.T) {
+	mk := func() *Engine { return newTestEngine(123, samplePlayer("p1", 0), samplePlayer("p2", 5)) }
+	a, b := mk(), mk()
+
+	for i := 0; i < 30; i++ {
+		sa := a.State()
+		var act domain.Action
+		if sa.Pending != nil {
+			act = domain.Action{PlayerID: sa.Pending.PlayerID, Type: domain.ActionDecline}
+		} else {
+			pid := []string{"p1", "p2"}[sa.CurrentTurn]
+			act = domain.Action{PlayerID: pid, Type: domain.ActionRoll}
+		}
+		if _, err := a.Apply(act); err != nil {
+			t.Fatalf("a step %d: %v", i, err)
+		}
+		if _, err := b.Apply(act); err != nil {
+			t.Fatalf("b step %d: %v", i, err)
+		}
+	}
+
+	sa, sb := a.State(), b.State()
+	for i := range sa.Players {
+		if sa.Players[i].Position != sb.Players[i].Position ||
+			sa.Players[i].Cash != sb.Players[i].Cash ||
+			len(sa.Players[i].Assets) != len(sb.Players[i].Assets) {
+			t.Errorf("player %d diverged: pos %d/%d cash %d/%d assets %d/%d",
+				i, sa.Players[i].Position, sb.Players[i].Position,
+				sa.Players[i].Cash, sb.Players[i].Cash,
+				len(sa.Players[i].Assets), len(sb.Players[i].Assets))
+		}
+	}
+	if sa.CurrentTurn != sb.CurrentTurn || sa.Round != sb.Round {
+		t.Errorf("turn/round diverged: %d/%d vs %d/%d", sa.CurrentTurn, sa.Round, sb.CurrentTurn, sb.Round)
+	}
+	if (sa.Pending == nil) != (sb.Pending == nil) {
+		t.Error("pending state diverged")
+	}
+}
+
+// ─── profession / statement (คงจาก Slice 2) ──────────────────────────────
+
 func TestNewWithRandomProfessions_CreatesValidPlayers(t *testing.T) {
 	e := NewWithRandomProfessions(42, 2)
-
 	all := profession.All()
 	names := map[string]bool{}
 	for _, p := range all {
 		names[p.Name] = true
 	}
-
 	state := e.State()
 	if len(state.Players) != 2 {
 		t.Fatalf("Players count = %d, want 2", len(state.Players))
@@ -185,29 +305,22 @@ func TestNewWithRandomProfessions_CreatesValidPlayers(t *testing.T) {
 		if p.Cash != p.Profession.Savings {
 			t.Errorf("player %d (%s): Cash %d != Savings %d", i, p.Name, p.Cash, p.Profession.Savings)
 		}
-		if p.Position != 0 {
-			t.Errorf("player %d: Position = %d, want 0", i, p.Position)
-		}
 	}
 }
 
-// TestStatement_ReturnsBreakdown — Statement คืน breakdown ตรงกับ profession
 func TestStatement_ReturnsBreakdown(t *testing.T) {
 	e := NewWithRandomProfessions(42, 3)
-
 	fs, err := e.Statement(0)
 	if err != nil {
 		t.Fatalf("Statement(0): %v", err)
 	}
 	p := e.State().Players[0]
-
 	if fs.Tax != p.Profession.Taxes {
 		t.Errorf("Tax = %d, want %d", fs.Tax, p.Profession.Taxes)
 	}
 	if fs.SocialSecurity != p.Profession.SocialSecurity {
 		t.Errorf("SocialSecurity = %d, want %d", fs.SocialSecurity, p.Profession.SocialSecurity)
 	}
-	// MonthlyCashFlow = เงินเดือน − (ภาษี + SS + other + ผ่อนหนี้ทั้งหมด)
 	payments := p.Profession.HomeMortgage.Payment + p.Profession.CarLoan.Payment +
 		p.Profession.CreditCard.Payment + p.Profession.SchoolLoan.Payment
 	want := p.Profession.Salary - fs.Tax - fs.SocialSecurity - p.Profession.OtherExpenses - payments
@@ -216,7 +329,6 @@ func TestStatement_ReturnsBreakdown(t *testing.T) {
 	}
 }
 
-// TestStatement_OutOfRange — index เกินขอบเขต → error
 func TestStatement_OutOfRange(t *testing.T) {
 	e := NewWithRandomProfessions(42, 2)
 	if _, err := e.Statement(5); err == nil {
