@@ -12,6 +12,7 @@ import (
 	"github.com/finance-boardgame/engine/cards"
 	"github.com/finance-boardgame/engine/domain"
 	"github.com/finance-boardgame/engine/finance"
+	"github.com/finance-boardgame/engine/loan"
 	"github.com/finance-boardgame/engine/profession"
 	"github.com/finance-boardgame/engine/ratrace"
 	"github.com/finance-boardgame/engine/rng"
@@ -94,6 +95,15 @@ func (e *Engine) Statement(idx int) (domain.FinancialStatement, error) {
 func (e *Engine) Apply(action domain.Action) ([]domain.Event, error) {
 	if e.state.Phase == domain.PhaseEnded {
 		return nil, errors.New("engine: game already ended")
+	}
+
+	// สินเชื่อ — กระทำได้ตลอดเทิร์นของผู้เล่นปัจจุบัน (ไม่ advance turn)
+	// ทำได้แม้ตอนมี Pending (เช่น กู้เพื่อเอาเงินซื้อดีลที่กำลังตัดสินใจ)
+	switch action.Type {
+	case domain.ActionTakeLoan:
+		return e.applyTakeLoan(action)
+	case domain.ActionPayOffLiability:
+		return e.applyPayOffLoan(action)
 	}
 
 	if e.state.Pending != nil {
@@ -257,6 +267,84 @@ func (e *Engine) playerByID(id string) *domain.Player {
 		}
 	}
 	return nil
+}
+
+// currentPlayer คืน pointer ของผู้เล่นที่กำลังเล่น ถ้า playerID ตรง (nil ถ้าไม่ใช่ตาของผู้เล่นนั้น)
+func (e *Engine) currentPlayer(playerID string) *domain.Player {
+	if len(e.state.Players) == 0 {
+		return nil
+	}
+	cur := &e.state.Players[e.state.CurrentTurn]
+	if cur.ID != playerID {
+		return nil
+	}
+	return cur
+}
+
+// applyTakeLoan — ผู้เล่นปัจจุบันขอสินเชื่อ (engine ประเมินคุณสมบัติผ่าน loan.Request)
+func (e *Engine) applyTakeLoan(action domain.Action) ([]domain.Event, error) {
+	player := e.currentPlayer(action.PlayerID)
+	if player == nil {
+		return nil, errors.New("engine: not your turn")
+	}
+	lender, _ := action.Payload["lender"].(string)
+	amountF, _ := action.Payload["amount"].(float64)
+	collatKind, _ := action.Payload["collateralKind"].(string)
+	collatRef, _ := action.Payload["collateralRef"].(string)
+
+	ln, err := loan.Request(*player, lender, domain.Money(amountF), collatKind, collatRef)
+	if err != nil {
+		return nil, err
+	}
+	ln.ID = fmt.Sprintf("loan-%d-%d", e.state.Round, len(player.Loans))
+	player.Loans = append(player.Loans, ln)
+	player.Cash += ln.Principal
+
+	return []domain.Event{eventWith(domain.EventCashChanged, player.ID, map[string]any{
+		"kind": "loan", "title": "ได้สินเชื่อ" + lenderLabel(lender), "amount": int64(ln.Principal),
+	})}, nil
+}
+
+// applyPayOffLoan — ปิดสินเชื่อ (lump-sum ยอดคงเหลือ) → คืนหลักค้ำ
+func (e *Engine) applyPayOffLoan(action domain.Action) ([]domain.Event, error) {
+	player := e.currentPlayer(action.PlayerID)
+	if player == nil {
+		return nil, errors.New("engine: not your turn")
+	}
+	loanID, _ := action.Payload["loanID"].(string)
+	idx := -1
+	for i := range player.Loans {
+		if player.Loans[i].ID == loanID {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, errors.New("engine: loan not found")
+	}
+	ln := player.Loans[idx]
+	if player.Cash < ln.Balance {
+		return nil, fmt.Errorf("engine: ไม่พอจ่ายปิดสินเชื่อ (ต้องการ %d มี %d)", ln.Balance, player.Cash)
+	}
+	player.Cash -= ln.Balance
+	player.Loans = append(player.Loans[:idx], player.Loans[idx+1:]...)
+
+	return []domain.Event{eventWith(domain.EventCashChanged, player.ID, map[string]any{
+		"kind": "loan-paid", "title": "ปิดสินเชื่อ", "amount": int64(-ln.Balance),
+	})}, nil
+}
+
+// lenderLabel แปลงรหัส lender → ป้ายภาษาไทยสำหรับ event log
+func lenderLabel(lender string) string {
+	switch lender {
+	case loan.LenderPersonal:
+		return "ส่วนบุคคล"
+	case loan.LenderSecured:
+		return "ค้ำหลักทรัพย์"
+	case loan.LenderInformal:
+		return "นอกระบบ"
+	}
+	return lender
 }
 
 // eventWith สร้าง Event พร้อม payload (Data)

@@ -335,3 +335,93 @@ func TestStatement_OutOfRange(t *testing.T) {
 		t.Error("expected error for out-of-range player index, got nil")
 	}
 }
+
+// ─── Loans (Slice 5) ──────────────────────────────────────────────────────
+
+// loanPlayer ผู้เล่นทดสอบสินเชื่อ: เงินเดือน 30,000 + บ้าน (ค้ำได้)
+func loanPlayer(id string) domain.Player {
+	return domain.Player{
+		ID: id, Name: id, Cash: 50_000, Position: 0,
+		Profession: domain.Profession{
+			Name:         "Tester",
+			Salary:       30_000,
+			HomeMortgage: domain.Liability{Payment: 3_000, Balance: 400_000},
+		},
+		Assets:      []domain.Asset{},
+		Liabilities: []domain.Liability{},
+		Loans:       []domain.Loan{},
+	}
+}
+
+func TestApply_TakeLoanPersonal_AddsLoanAndCash(t *testing.T) {
+	e := newTestEngine(42, loanPlayer("p1"))
+	_, err := e.Apply(domain.Action{
+		PlayerID: "p1", Type: domain.ActionTakeLoan,
+		Payload:  map[string]any{"lender": "personal", "amount": float64(50_000)},
+	})
+	if err != nil {
+		t.Fatalf("take loan: %v", err)
+	}
+	p := e.State().Players[0]
+	if len(p.Loans) != 1 {
+		t.Fatalf("Loans count = %d, want 1", len(p.Loans))
+	}
+	if p.Loans[0].Principal != 50_000 {
+		t.Errorf("Principal = %d, want 50000", p.Loans[0].Principal)
+	}
+	if p.Cash != 100_000 {
+		t.Errorf("Cash = %d, want 100000 (50000 + 50000 loan)", p.Cash)
+	}
+}
+
+func TestApply_TakeLoan_OverLimitRejected(t *testing.T) {
+	e := newTestEngine(42, loanPlayer("p1")) // salary 30,000 → personal max 150,000
+	_, err := e.Apply(domain.Action{
+		PlayerID: "p1", Type: domain.ActionTakeLoan,
+		Payload:  map[string]any{"lender": "personal", "amount": float64(200_000)},
+	})
+	if err == nil {
+		t.Error("expected over-limit rejection, got nil")
+	}
+	if len(e.State().Players[0].Loans) != 0 {
+		t.Error("loan should not be added on rejection")
+	}
+}
+
+func TestApply_TakeLoan_NotYourTurn(t *testing.T) {
+	e := newTestEngine(42, loanPlayer("p1"), loanPlayer("p2")) // current = p1
+	_, err := e.Apply(domain.Action{
+		PlayerID: "p2", Type: domain.ActionTakeLoan,
+		Payload:  map[string]any{"lender": "personal", "amount": float64(10_000)},
+	})
+	if err == nil {
+		t.Error("expected not-your-turn error, got nil")
+	}
+}
+
+func TestApply_PayOffLoan_ClearsLoan(t *testing.T) {
+	e := newTestEngine(42, loanPlayer("p1"))
+	if _, err := e.Apply(domain.Action{
+		PlayerID: "p1", Type: domain.ActionTakeLoan,
+		Payload:  map[string]any{"lender": "personal", "amount": float64(50_000)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	loanID := e.State().Players[0].Loans[0].ID
+
+	_, err := e.Apply(domain.Action{
+		PlayerID: "p1", Type: domain.ActionPayOffLiability,
+		Payload:  map[string]any{"loanID": loanID},
+	})
+	if err != nil {
+		t.Fatalf("pay off: %v", err)
+	}
+	p := e.State().Players[0]
+	if len(p.Loans) != 0 {
+		t.Errorf("Loans count = %d, want 0 after payoff", len(p.Loans))
+	}
+	// cash = 100000 (หลังกู้) − 74000 (balance) = 26000
+	if p.Cash != 26_000 {
+		t.Errorf("Cash = %d, want 26000", p.Cash)
+	}
+}
