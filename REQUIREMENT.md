@@ -65,3 +65,23 @@
 - `packages/engine` (Go): pure + deterministic, คอมไพล์ทั้ง server binary และ WASM
 - `apps/backend` (Go): REST + WS hub + persistence + AI host
 - `apps/web` (Next.js): เลือก host engine ระหว่าง backend (online/async) หรือ WASM (local/AI)
+
+---
+
+## 🔄 Proposed Evolution — Session #3 (Lifetime Financial Simulation)
+
+> ⚠️ **ยังไม่ล็อก** — เป็นวิสัยทัศน์ที่กำลังหารือ รอตัดสินใจ (ดู open questions ใน `NOTE.md` Session #3)
+> FR/NFR ด้านบนยังเป็น baseline ระยะใกล้; ส่วนนี้คือทิศทางระยะกลาง-ยาว
+
+### Epics ที่เสนอ
+- [ ] **EPIC-L1 Lifetime Timeline**: ผู้เล่นมีอายุ เวลาเดินพร้อมกัน เกมจบที่อายุ 80+ พร้อม life review
+- [ ] **EPIC-L2 Vitals System**: สุขภาพ/ความเครียด/พลังงาน/เวลา กระทบการตัดสินใจ (อายุมากใช้พลังงานน้อย)
+- [ ] **EPIC-L3 Insurance Systems**: ประกันสังคม/ชีวิต/อุบัติเหตุ/สุขภาพ สอนจัดการความเสี่ยง
+- [ ] **EPIC-L4 Realistic Tax**: ลดหย่อนภาษี จ่ายภาษีทุกปี วางแผนภาษี
+- [ ] **EPIC-L5 Real Investing**: อ่านหุ้นจริง วางแผนการเงินจริง
+- [ ] **EPIC-L6 Childhood Mode (เฟส 2)**: ย้อนวัยเด็ก/ประถม — เงินจากพ่อแม่ ความแตกต่างของการเติบโต
+
+### ผลกระทบต่อ Architecture (ต้องคุยให้ชัด)
+- engine ปัจจุบัน = turn-based + seeded RNG ยังไม่มี concept "อายุ/เวลา" → อาจต้องเพิ่ม
+- "การหลุดวงหนู" เปลี่ยนจาก win-condition เป็น milestone หนึ่งในชีวิต
+- ระบบ vitals/insurance/tax = domain types ใหม่ใน `packages/engine/domain`

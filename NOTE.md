@@ -42,3 +42,30 @@
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `REQUIREMENT.md` (เพิ่ม FR/NFR + Tech Stack + Architecture)
 - Scaffold โครงสร้าง Monorepo: `packages/engine`, `apps/backend`, `apps/web`, `api-contracts`, `tooling`
+
+## 📌 Session #3 — Glossary + Lifetime-Simulation Vision (2026-08-12)
+- **ผู้ปรึกษา**: User
+- **Coach**: AI Financial & Programming Coach
+
+### 🎯 สิ่งที่ทำ (deliverable)
+- สร้าง **คัมภีร์การเงิน** เป็นหน้าเว็บ `/glossary` (data-driven, ค้นหา/กรองหมวดได้)
+  - รวบรวมคำศัพท์ ~26 คำ พร้อมที่มาที่ไป + ตัวอย่าง + mapping ไป engine field
+  - เป้าหมาย: ทีมและผู้เล่นเข้าใจตรงกัน; ผู้สร้างเรียนรู้ไปพร้อมสร้าง (User บอกเองว่ายังไม่เข้าใจ เช่น Taxes/ประกัน)
+
+### 🗣 วิสัยทัศน์ใหม่ที่หารือ (ยังไม่ล็อก)
+User แชร์วิสัยทัศน์ที่ขยายจาก Cashflow ไปสู่ **"จำลองชีวิตการเงินตลอดทั้งชีวิต"**:
+- ผู้เล่น = จบใหม่สุ่มอาชีพ, อายุเริ่มต้นต่างกัน
+- เวลาเดินพร้อมกัน แก่ไปด้วยกัน; **จบเมื่ออายุเกิน 80** แล้วรีวิวชีวิต
+- ระบบใหม่: Vitals (สุขภาพ/ความเครียด/พลังงาน/เวลา), ประกัน (สังคม/ชีวิต/อุบัติเหตุ/สุขภาพ), ภาษีสมจริง (ลดหย่อน/จ่ายทุกปี), อ่านหุ้นจริง
+- เฟส 2 (ทีหลัง): ระบบวัยเด็ก/ประถม (เงินจากพ่อแม่ ความแตกต่างของการเติบโต)
+- เฟสตั้งใจเริ่มที่ผู้ใหญ่ก่อน: "ให้คุ้นชินระบบเกมและเข้าใจชีวิตก่อน แล้วค่อยย้อนวัยเด็ก"
+
+### ❓ Open Questions (รอตัดสินใจ)
+1. **ทิศทางหลัก**: ล็อกเป็น "Lifetime Sim" เลย หรือค่อย ๆ เพิ่ม realism บนฐาน Cashflow?
+2. **โมเดลเวลาใน engine**: ปัจจุบัน engine เป็น turn-based + seeded RNG; lifetime-sim อาจต้องมี "นาฬิกา/อายุ" → กระทบ architecture
+3. **Vertical slice แรก**: อยากได้ playable แบบไหนก่อน (Rat Race loop / lifetime skeleton / systems แยก)?
+4. **จุดจบเกม**: รีวิวชีวิตที่อายุ 80+ ยังไง? คะแนน? บอกเล่า? เปรียบเทียบ?
+
+### 📦 ผลลัพธ์ของ Session
+- อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
+- สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
