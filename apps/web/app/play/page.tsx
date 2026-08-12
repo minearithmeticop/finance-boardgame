@@ -12,8 +12,10 @@ import {
 } from '@/lib/engine-wasm/wasm';
 import {
   ActionType,
+  AssetType,
   EventType,
   TileType,
+  type Event,
   type FinancialStatement,
   type GameState,
   type Tile,
@@ -21,13 +23,11 @@ import {
 
 const PER_SIDE = 7; // 7×7 perimeter = 24 ช่อง
 
-// แม็ป tile index → (row, col) ในกริด 7×7 เรียงตามเข็มนาฬิกาจากมุมบนซ้าย
-// index 0 (Payday) = มุมบนซ้าย
 function tileToGrid(i: number): { r: number; c: number } {
-  if (i <= 6) return { r: 0, c: i }; // top L→R
-  if (i <= 12) return { r: i - 6, c: 6 }; // right T→B
-  if (i <= 18) return { r: 6, c: 18 - i }; // bottom R→L
-  return { r: 24 - i, c: 0 }; // left B→T
+  if (i <= 6) return { r: 0, c: i };
+  if (i <= 12) return { r: i - 6, c: 6 };
+  if (i <= 18) return { r: 6, c: 18 - i };
+  return { r: 24 - i, c: 0 };
 }
 
 const TILE_STYLE: Record<number, { icon: string; cls: string }> = {
@@ -42,6 +42,15 @@ const TILE_STYLE: Record<number, { icon: string; cls: string }> = {
   [TileType.Blank]: { icon: '·', cls: 'border-slate-700 bg-slate-800/30' },
 };
 
+const ASSET_LABEL: Record<number, string> = {
+  [AssetType.Stock]: 'หุ้น',
+  [AssetType.RealEstate]: 'อสังหาฯ',
+  [AssetType.Business]: 'ธุรกิจ',
+  [AssetType.Other]: 'อื่นๆ',
+};
+
+const PLAYER_COLORS = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500'];
+
 function tileIcon(type?: number): string {
   if (type === undefined) return '';
   return TILE_STYLE[type]?.icon ?? '·';
@@ -52,7 +61,36 @@ interface LogEntry {
   text: string;
 }
 
-const PLAYER_COLORS = ['bg-emerald-500', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500'];
+// สร้างบรรทัด log จาก events ของ action หนึ่ง
+function logFromEvents(events: Event[], name: string, board: Tile[]): string {
+  const parts: string[] = [];
+  let moved = '';
+  for (const ev of events) {
+    const d = (ev.Data ?? {}) as Record<string, number | string>;
+    switch (ev.Type) {
+      case EventType.Moved: {
+        const pos = Number(d.position);
+        moved = `🎲 ${name} ทอยได้ ${d.steps} → ช่อง ${pos} ${tileIcon(board[pos]?.Type)}`;
+        break;
+      }
+      case EventType.Payday:
+        parts.push(`💰 +${Number(d.amount).toLocaleString()}`);
+        break;
+      case EventType.Landed:
+        if (d.kind === 'opportunity') parts.push(`🃏 ดีล: ${d.title}`);
+        else if (d.kind === 'declined') parts.push(`⏭️ ผ่าน: ${d.title}`);
+        break;
+      case EventType.CashChanged:
+        if (d.kind === 'shopping') parts.push(`🛍️ ${d.title} ${Number(d.amount).toLocaleString()}`);
+        else if (d.kind === 'crisis') parts.push(`⚠️ ${d.title} ${Number(d.amount).toLocaleString()}`);
+        break;
+      case EventType.AssetBought:
+        parts.push(`🏠 ซื้อ: ${d.title}`);
+        break;
+    }
+  }
+  return [moved, ...parts].filter(Boolean).join('   ');
+}
 
 export default function PlayPage() {
   const [status, setStatus] = useState('กำลังโหลด engine…');
@@ -60,7 +98,7 @@ export default function PlayPage() {
   const [state, setState] = useState<GameState | null>(null);
   const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
-  const [rolling, setRolling] = useState(false);
+  const [busy, setBusy] = useState(false);
   const logId = useRef(0);
 
   useEffect(() => {
@@ -84,14 +122,18 @@ export default function PlayPage() {
 
   function pushLog(text: string) {
     logId.current += 1;
-    setLog((l) => [{ id: logId.current, text }, ...l].slice(0, 8));
+    setLog((l) => [{ id: logId.current, text }, ...l].slice(0, 12));
   }
 
-  // ดึง breakdown งบการเงินของทุกผู้เล่นจาก engine
   function fetchStatements(n: number): FinancialStatement[] {
     const out: FinancialStatement[] = [];
     for (let i = 0; i < n; i++) out.push(getStatement(i));
     return out;
+  }
+
+  function refreshFrom(state: GameState, refreshStmts: boolean) {
+    setState(state);
+    if (refreshStmts) setStatements(fetchStatements(state.Players.length));
   }
 
   function startNewGame() {
@@ -108,51 +150,65 @@ export default function PlayPage() {
     }
   }
 
+  function nameOf(id: string): string {
+    return state?.Players.find((p) => p.ID === id)?.Name ?? id;
+  }
+
   function handleRoll() {
-    if (!state || rolling) return;
-    setRolling(true);
+    if (!state || busy || state.Pending) return;
+    setBusy(true);
     try {
       const cur = state.Players[state.CurrentTurn];
-      const prevPos = cur.Position;
-      const prevCash = cur.Cash;
-      const n = board.length || 24;
-
       const events = applyAction({ PlayerID: cur.ID, Type: ActionType.Roll });
       const next = getGameState();
-      const moved = next.Players.find((p) => p.ID === cur.ID);
-      if (!moved) throw new Error('player not found after roll');
-
-      const steps = ((moved.Position - prevPos) + n) % n;
-      const gain = moved.Cash - prevCash;
-      const gotPayday = events.some((e) => e.Type === EventType.Payday);
-
-      let text = `🎲 ${cur.Name} ทอยได้ ${steps} → ช่อง ${moved.Position} ${tileIcon(board[moved.Position]?.Type)}`;
-      if (gotPayday) text += `  →  💰 +${gain.toLocaleString()}`;
-      pushLog(text);
-
-      setState(next);
+      pushLog(logFromEvents(events, cur.Name, board));
+      refreshFrom(next, false);
     } catch (e) {
       setStatus(`❌ ${(e as Error).message}`);
     } finally {
-      setRolling(false);
+      setBusy(false);
     }
   }
 
+  function resolvePending(type: number, verb: string, refreshStmts: boolean) {
+    if (!state?.Pending) return;
+    setBusy(true);
+    try {
+      const pending = state.Pending;
+      applyAction({ PlayerID: pending.PlayerID, Type: type });
+      const next = getGameState();
+      pushLog(`${verb} ${nameOf(pending.PlayerID)}: ${pending.DealCard.Title}`);
+      refreshFrom(next, refreshStmts);
+    } catch (e) {
+      setStatus(`❌ ${(e as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const handleBuy = () => resolvePending(ActionType.BuyAsset, '🏠 ซื้อ', true);
+  const handleDecline = () => resolvePending(ActionType.Decline, '⏭️ ผ่าน', false);
+
   const current = state ? state.Players[state.CurrentTurn] : null;
   const currentStmt = state ? statements[state.CurrentTurn] : undefined;
-  const ready = state !== null;
+  const pending = state?.Pending ?? null;
+  const pendingPlayer = pending ? state!.Players.find((p) => p.ID === pending.PlayerID) : undefined;
+  const canAfford = pending && pendingPlayer
+    ? pendingPlayer.Cash >= pending.DealCard.DownPayment
+    : false;
+  const pendingNet = pending ? pending.DealCard.CashFlow - pending.DealCard.LoanPayment : 0;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-emerald-400">🎮 เล่นเกม (Slice 1.5 + อาชีพจริง)</h1>
+        <h1 className="text-3xl font-bold text-emerald-400">🎮 เล่นเกม (Slice 3 — ดีล + วิกฤต)</h1>
         <p className="mt-1 text-sm text-slate-400">
-          ผู้เล่นถูกสุ่มอาชีพจริง (เงินเดือน/ภาษี/ประกันสังคม/หนี้) — กดทอยเต๋าเดินรอบกระดาน ผ่าน Payday แล้วรับเงินสดสุทธิ
+          สุ่มอาชีพจริง → ทอยเต๋า → ตก 🃏 Opportunity (เลือกซื้อสินทรัพย์) / 🛍️ Shopping / ⚠️ Crisis
         </p>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* ── กระดานจตุรัส ── */}
+        {/* ── กระดาน ── */}
         <div className="relative mx-auto aspect-square w-full max-w-2xl">
           <div className="relative grid h-full w-full grid-cols-7 grid-rows-7 gap-1">
             {board.map((tile, i) => {
@@ -170,7 +226,6 @@ export default function PlayPage() {
               );
             })}
 
-            {/* center panel */}
             <div
               style={{ gridRow: '2 / span 5', gridColumn: '2 / span 5' }}
               className="flex flex-col items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center"
@@ -178,28 +233,29 @@ export default function PlayPage() {
               <div className="text-sm font-semibold text-emerald-400">Finance Boardgame</div>
               {current ? (
                 <div className="text-lg text-slate-100">
-                  ถึงตา <span className="font-bold">{current.Name}</span>
+                  {pending ? '🃏 ตัดสินใจดีล' : 'ถึงตา'} <span className="font-bold">{current.Name}</span>
                 </div>
               ) : (
                 <div className="text-slate-500">…</div>
               )}
               {currentStmt && (
                 <div className="text-xs text-slate-400">
-                  สุทธิ/เดือน{' '}
-                  <b className="text-emerald-400">{currentStmt.MonthlyCashFlow.toLocaleString()}</b>{' '}
-                  · รอบที่ {state?.Round ?? 0}
+                  สุทธิ/เดือน <b className="text-emerald-400">{currentStmt.MonthlyCashFlow.toLocaleString()}</b>
+                  <span className="ml-2 text-slate-500">· รอบที่ {state?.Round ?? 0}</span>
                 </div>
               )}
-              <button
-                onClick={handleRoll}
-                disabled={!ready || rolling}
-                className="mt-1 rounded-md bg-emerald-600 px-5 py-2 font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {rolling ? 'กำลังทอย…' : '🎲 ทอยเต๋า'}
-              </button>
+              {!pending && (
+                <button
+                  onClick={handleRoll}
+                  disabled={busy}
+                  className="mt-1 rounded-md bg-emerald-600 px-5 py-2 font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {busy ? '…' : '🎲 ทอยเต๋า'}
+                </button>
+              )}
               <button
                 onClick={startNewGame}
-                disabled={rolling}
+                disabled={busy}
                 className="text-xs text-slate-400 underline-offset-2 transition hover:text-emerald-400 hover:underline disabled:opacity-40"
               >
                 สุ่มอาชีพใหม่
@@ -207,7 +263,6 @@ export default function PlayPage() {
               <p className="mt-1 max-w-xs text-xs text-slate-500">{status}</p>
             </div>
 
-            {/* ── tokens ── */}
             {state?.Players.map((p, idx) => {
               const { r, c } = tileToGrid(p.Position);
               const onTile = state.Players.filter((q) => q.Position === p.Position);
@@ -234,7 +289,7 @@ export default function PlayPage() {
           </div>
         </div>
 
-        {/* ── ข้าง: งบการเงินผู้เล่น + event log ── */}
+        {/* ── ข้าง ── */}
         <aside className="flex flex-col gap-4">
           <section className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
             <h2 className="mb-3 text-sm font-semibold text-slate-300">ผู้เล่น & งบการเงิน</h2>
@@ -242,6 +297,7 @@ export default function PlayPage() {
               {state?.Players.map((p, idx) => {
                 const fs = statements[idx];
                 const isCurrent = current?.ID === p.ID;
+                const assets = p.Assets ?? [];
                 return (
                   <li
                     key={p.ID}
@@ -250,19 +306,17 @@ export default function PlayPage() {
                     <div className="flex items-center gap-2 text-sm">
                       <span className={`h-3 w-3 shrink-0 rounded-full ${PLAYER_COLORS[idx % PLAYER_COLORS.length]}`} />
                       <span className="font-semibold text-slate-100">{p.Name}</span>
-                      <span className="ml-auto font-mono text-emerald-400">
-                        {p.Cash.toLocaleString()}
-                      </span>
+                      <span className="ml-auto font-mono text-emerald-400">{p.Cash.toLocaleString()}</span>
                     </div>
                     {fs && (
                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-400">
                         <span>เงินเดือน <b className="text-slate-300">{fs.EarnedIncome.toLocaleString()}</b></span>
-                        <span>ภาษี <b className="text-slate-300">{fs.Tax.toLocaleString()}</b></span>
-                        <span>ประกันสังคม <b className="text-slate-300">{fs.SocialSecurity.toLocaleString()}</b></span>
-                        <span>รายจ่ายรวม <b className="text-slate-300">{fs.TotalExpenses.toLocaleString()}</b></span>
-                        <span className="col-span-2">
-                          สุทธิ/เดือน <b className="text-emerald-400">{fs.MonthlyCashFlow.toLocaleString()}</b>
-                          <span className="ml-2 text-slate-500">· ช่อง {p.Position}</span>
+                        <span>สุทธิ/เดือน <b className="text-emerald-400">{fs.MonthlyCashFlow.toLocaleString()}</b></span>
+                        <span className="col-span-2 text-slate-500">
+                          สินทรัพย์ {assets.length} หน่วย · ช่อง {p.Position}
+                          {assets.length > 0 && (
+                            <span className="ml-1 text-slate-400">({assets.map((a) => a.Name).join(', ')})</span>
+                          )}
                         </span>
                       </div>
                     )}
@@ -279,15 +333,57 @@ export default function PlayPage() {
             ) : (
               <ul className="space-y-1 text-xs text-slate-300">
                 {log.map((e) => (
-                  <li key={e.id} className="border-l-2 border-slate-600 pl-2">
-                    {e.text}
-                  </li>
+                  <li key={e.id} className="border-l-2 border-slate-600 pl-2">{e.text}</li>
                 ))}
               </ul>
             )}
           </section>
         </aside>
       </div>
+
+      {/* ── Opportunity decision modal ── */}
+      {pending && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-lg border border-sky-500/50 bg-slate-900 p-5 shadow-xl">
+            <div className="mb-1 text-xs text-sky-400">🃏 โอกาส — {ASSET_LABEL[pending.DealCard.AssetType] ?? 'สินทรัพย์'}</div>
+            <h3 className="mb-3 text-xl font-bold text-slate-100">{pending.DealCard.Title}</h3>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm text-slate-300">
+              <dt className="text-slate-500">ราคาเต็ม</dt><dd className="text-right">{pending.DealCard.Cost.toLocaleString()}</dd>
+              <dt className="text-slate-500">เงินดาวน์</dt><dd className="text-right">{pending.DealCard.DownPayment.toLocaleString()}</dd>
+              <dt className="text-slate-500">รายได้/เดือน</dt><dd className="text-right text-emerald-400">+{pending.DealCard.CashFlow.toLocaleString()}</dd>
+              {pending.DealCard.LoanPayment > 0 && (
+                <><dt className="text-slate-500">ผ่อน/เดือน</dt><dd className="text-right text-rose-400">−{pending.DealCard.LoanPayment.toLocaleString()}</dd></>
+              )}
+              <dt className="text-slate-500">สุทธิ/เดือน</dt>
+              <dd className={`text-right font-bold ${pendingNet >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                {pendingNet >= 0 ? '+' : ''}{pendingNet.toLocaleString()}
+              </dd>
+            </dl>
+            {pendingPlayer && (
+              <p className="mt-3 text-xs text-slate-500">
+                เงินสด {pendingPlayer.Name}: <b className="text-slate-300">{pendingPlayer.Cash.toLocaleString()}</b>
+                {!canAfford && <span className="ml-1 text-rose-400">(ไม่พอจ่ายดาวน์)</span>}
+              </p>
+            )}
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleBuy}
+                disabled={!canAfford || busy}
+                className="flex-1 rounded-md bg-emerald-600 px-4 py-2 font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ซื้อ (−{pending.DealCard.DownPayment.toLocaleString()})
+              </button>
+              <button
+                onClick={handleDecline}
+                disabled={busy}
+                className="rounded-md border border-slate-600 px-4 py-2 font-medium text-slate-300 transition hover:bg-slate-800 disabled:opacity-40"
+              >
+                ผ่าน
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

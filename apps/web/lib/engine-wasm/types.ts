@@ -12,6 +12,7 @@ export interface GameState {
   CurrentTurn: number;
   Round: number;
   Seed: number;
+  Pending?: PendingDecision | null;
 }
 
 export interface Player {
@@ -60,6 +61,7 @@ export interface Asset {
 export interface Event {
   Type: number;
   PlayerID: string;
+  Data?: Record<string, number | string>;
 }
 
 export interface Tile {
@@ -80,6 +82,22 @@ export interface FinancialStatement {
   TotalLiabilities: number;
 }
 
+// 🃏 การ์ดดีลจากช่อง Opportunity
+export interface DealCard {
+  Title: string;
+  AssetType: number;
+  DownPayment: number;
+  Cost: number;
+  CashFlow: number;
+  LoanPayment: number;
+}
+
+// ดีลที่กำลังรอผู้เล่นตัดสินใจ (ซื้อ/ผ่าน)
+export interface PendingDecision {
+  PlayerID: string;
+  DealCard: DealCard;
+}
+
 // ── Enum const mirrors (ค่าตรงกับ iota ใน Go domain) ──────────────────────
 // อ้างอิง: packages/engine/domain/types.go
 
@@ -96,6 +114,14 @@ export const ActionType = {
   PayOffLiability: 3,
   TakeLoan: 4,
   EndTurn: 5,
+  Decline: 6,
+} as const;
+
+export const AssetType = {
+  Stock: 0,
+  RealEstate: 1,
+  Business: 2,
+  Other: 3,
 } as const;
 
 export const EventType = {
