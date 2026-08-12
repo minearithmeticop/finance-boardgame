@@ -75,6 +75,15 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
   - commits: `72c1d35` (board types), `a9aff02` (turn engine + tests)
 - **ถัดไป — Slice 2**: ข้อมูลอาชีพจริง + ประกันสังคมหัก ณ ที่จ่าย (realism ที่ User ต้องการ)
 
+### 🛠 Slice 1.5 — Wire engine to browser ✅ ทำเสร็จ + browser smoke test ผ่าน
+- expose engine API ผ่าน WASM: `engineCreate/State/Apply/Board` (JSON envelope `{data,error}`); single global engine + mutex
+- แก้ startup race: Go `main()` set `__engineWasmReady` + loader poll จน ready
+- หน้า `/play`: **กระดานจตุรัส 7×7** (24 ช่องรอบขอบ, Payday มุมบนซ้าย) + token เลื่อน animate (CSS transition) + center panel + infer delta จาก state-diff
+- **browser smoke test ผ่านจริง**: กดทอย → token เดิน → สลับเทิร์น → รอบที่ 9 → **Payday `+2,000`** ทั้งสองคน (1,000 → 3,000) ✅
+- ✅ **validate สถาปัตยกรรม Universal Engine end-to-end สำเร็จ** (Go engine → WASM → browser → Next.js UI)
+- commits: `64a458c` (engine WASM API), `b9e5e91` (web client + /play)
+- ⚠️ **Tech debt (type mirroring)**: TS types/enum mirror Go ด้วยมือ (`lib/engine-wasm/types.ts`) เพราะ Go enum serialize เป็น int → เสี่ยง drift → **Slice ถัดไปควรทำ codegen** (NFR-006)
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
