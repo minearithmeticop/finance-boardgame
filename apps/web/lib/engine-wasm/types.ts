@@ -31,6 +31,7 @@ export interface Profession {
   Name: string;
   Salary: number;
   Taxes: number;
+  SocialSecurity: number;
   OtherExpenses: number;
   HomeMortgage: Liability;
   SchoolLoan: Liability;

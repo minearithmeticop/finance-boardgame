@@ -56,6 +56,7 @@ function makePlayer(id: string, name: string): Player {
       Name: 'Tester',
       Salary: 2000,
       Taxes: 0,
+      SocialSecurity: 0,
       OtherExpenses: 0,
       HomeMortgage: zeroLiability,
       SchoolLoan: zeroLiability,
