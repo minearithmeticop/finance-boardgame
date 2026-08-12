@@ -99,10 +99,11 @@ export const EventType = {
 export const TileType = {
   Payday: 0,
   Opportunity: 1,
-  Doodad: 2,
-  Market: 3,
-  Downsizing: 4,
-  Baby: 5,
-  Charity: 6,
-  Blank: 7,
+  Shopping: 2,
+  Crisis: 3,
+  Market: 4,
+  Downsizing: 5,
+  Baby: 6,
+  Charity: 7,
+  Blank: 8,
 } as const;

@@ -32,7 +32,8 @@ function tileToGrid(i: number): { r: number; c: number } {
 const TILE_STYLE: Record<number, { icon: string; cls: string }> = {
   [TileType.Payday]: { icon: '💰', cls: 'border-emerald-500/60 bg-emerald-500/15' },
   [TileType.Opportunity]: { icon: '🃏', cls: 'border-sky-500/60 bg-sky-500/15' },
-  [TileType.Doodad]: { icon: '🛍️', cls: 'border-amber-500/60 bg-amber-500/15' },
+  [TileType.Shopping]: { icon: '🛍️', cls: 'border-amber-500/60 bg-amber-500/15' },
+  [TileType.Crisis]: { icon: '⚠️', cls: 'border-red-500/60 bg-red-500/15' },
   [TileType.Market]: { icon: '📈', cls: 'border-violet-500/60 bg-violet-500/15' },
   [TileType.Downsizing]: { icon: '📉', cls: 'border-rose-500/60 bg-rose-500/15' },
   [TileType.Baby]: { icon: '👶', cls: 'border-pink-500/60 bg-pink-500/15' },
