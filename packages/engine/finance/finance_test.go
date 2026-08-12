@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/finance-boardgame/engine/domain"
+	"github.com/finance-boardgame/engine/payroll"
+	"github.com/finance-boardgame/engine/profession"
 )
 
 // helper สร้าง player พื้นฐานสำหรับทดสอบ
@@ -87,4 +89,56 @@ func TestCanEscapeRatRace(t *testing.T) {
 	if !CanEscapeRatRace(p2) {
 		t.Error("expected can escape (passive 150 >= expenses 100)")
 	}
+}
+
+// TestStatement_IncludesSocialSecurityInExpenses — SS ต้องถูกนำรวมเข้า TotalExpenses
+func TestStatement_IncludesSocialSecurityInExpenses(t *testing.T) {
+	p := samplePlayer(20_000, 0, 0, 0, 0) // taxes/other/mortgage = 0
+	p.Profession.SocialSecurity = 750
+
+	fs := Statement(p)
+
+	if fs.SocialSecurity != 750 {
+		t.Errorf("SocialSecurity = %d, want 750", fs.SocialSecurity)
+	}
+	if fs.TotalExpenses != 750 {
+		t.Errorf("TotalExpenses = %d, want 750 (เกิดจาก SS เพียงตัวเดียว)", fs.TotalExpenses)
+	}
+}
+
+// TestStatement_RealProfessionPaycheck — ใช้อาชีพจริง (วิศวกร) ตรวจ breakdown เงินเดือน
+// เป็น teaching artifact: เห็นเลขจริงว่าเงินเดือนถูกหัก ณ ที่จ่ายยังไง
+func TestStatement_RealProfessionPaycheck(t *testing.T) {
+	var eng domain.Profession
+	for _, p := range profession.All() {
+		if p.Name == "วิศวกร" {
+			eng = p
+			break
+		}
+	}
+	if eng.Name == "" {
+		t.Fatal("ไม่พบ 'วิศวกร' ใน profession dataset")
+	}
+
+	player := domain.Player{ID: "p1", Cash: eng.Savings, Profession: eng}
+	fs := Statement(player)
+
+	// breakdown ตรงตาม formula
+	if fs.Tax != payroll.MonthlyTax(eng.Salary) {
+		t.Errorf("Tax = %d, want %d", fs.Tax, payroll.MonthlyTax(eng.Salary))
+	}
+	if fs.SocialSecurity != payroll.SocialSecurity(eng.Salary) {
+		t.Errorf("SocialSecurity = %d, want %d", fs.SocialSecurity, payroll.SocialSecurity(eng.Salary))
+	}
+
+	// MonthlyCashFlow = เงินเดือน − ภาษี − SS − other − ผ่อนหนี้ทั้งหมด
+	payments := eng.HomeMortgage.Payment + eng.CarLoan.Payment + eng.CreditCard.Payment + eng.SchoolLoan.Payment
+	want := eng.Salary - fs.Tax - fs.SocialSecurity - eng.OtherExpenses - payments
+	if fs.MonthlyCashFlow != want {
+		t.Errorf("MonthlyCashFlow = %d, want %d", fs.MonthlyCashFlow, want)
+	}
+
+	// แสดง paycheck จริงใน test output (สอนผู้สร้าง)
+	t.Logf("วิศวกร: เงินเดือน %d − ภาษี %d − SS %d − อื่นๆ %d − ผ่อน %d = สุทธิ %d/เดือน",
+		eng.Salary, fs.Tax, fs.SocialSecurity, eng.OtherExpenses, payments, fs.MonthlyCashFlow)
 }

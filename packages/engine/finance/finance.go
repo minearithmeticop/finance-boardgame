@@ -24,8 +24,10 @@ func Statement(p domain.Player) domain.FinancialStatement {
 	}
 	fs.TotalIncome = fs.EarnedIncome + fs.PassiveIncome + fs.PortfolioIncome
 
-	// --- Expenses ---
-	fs.TotalExpenses = p.Profession.Taxes + p.Profession.OtherExpenses
+	// --- Expenses (หัก ณ ที่จ่าย: ภาษี + ประกันสังคม + อื่นๆ + ผ่อนหนี้) ---
+	fs.Tax = p.Profession.Taxes
+	fs.SocialSecurity = p.Profession.SocialSecurity
+	fs.TotalExpenses = fs.Tax + fs.SocialSecurity + p.Profession.OtherExpenses
 	fs.TotalExpenses += p.Profession.HomeMortgage.Payment +
 		p.Profession.SchoolLoan.Payment +
 		p.Profession.CarLoan.Payment +

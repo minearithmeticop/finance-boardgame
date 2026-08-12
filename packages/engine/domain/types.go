@@ -80,15 +80,16 @@ type Liability struct {
 
 // Profession — อาชีพเริ่มต้น กำหนดเงินเดือนและรายจ่าย/หนี้สินพื้นฐาน
 type Profession struct {
-	Name          string
-	Salary        Money
-	Taxes         Money
-	OtherExpenses Money
-	HomeMortgage  Liability
-	SchoolLoan    Liability
-	CarLoan       Liability
-	CreditCard    Liability
-	Savings       Money // เงินสดเริ่มต้น
+	Name           string
+	Salary         Money
+	Taxes          Money // ภาษีเงินได้/เดือน (คำนวณจากขั้นบันได ตอนสร้างอาชีพ)
+	SocialSecurity Money // ประกันสังคมหัก ณ ที่จ่าย (5% capped)
+	OtherExpenses  Money
+	HomeMortgage   Liability
+	SchoolLoan     Liability
+	CarLoan        Liability
+	CreditCard     Liability
+	Savings        Money // เงินสดเริ่มต้น
 }
 
 // Player — ผู้เล่นหนึ่งคนในเกม
@@ -112,6 +113,10 @@ type FinancialStatement struct {
 	PassiveIncome   Money // รายได้จากอสังหา/ธุรกิจ
 	PortfolioIncome Money // รายได้จากหุ้น
 	TotalIncome     Money
+
+	// รายจ่ายหัก ณ ที่จ่าย (breakdown ให้เห็นชัด)
+	Tax            Money // ภาษีเงินได้/เดือน
+	SocialSecurity Money // ประกันสังคม/เดือน
 
 	TotalExpenses   Money
 	MonthlyCashFlow Money // TotalIncome - TotalExpenses
