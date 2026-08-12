@@ -129,6 +129,21 @@ type Liability struct {
 	Balance Money // เงินต้นคงเหลือ
 }
 
+// Loan — สินเชื่อ (กู้เงิน) แยกจาก Liability เพื่อเก็บข้อมูลเชิงสินเชื่อ
+// (lender/ดอกเบี้ย/ระยะ/หลักค้ำ) — MonthlyPay ถูกรวมเข้ารายจ่ายเหมือน Liability
+type Loan struct {
+	ID         string
+	Lender     string // "personal" | "secured" | "informal"
+	Principal  Money  // เงินต้นที่ได้รับ (Cash += Principal ตอนกู้)
+	RateYear   int    // อัตราดอกเบี้ยร้อยละต่อปี
+	TermMonths int
+	MonthlyPay Money  // ค่างวด/เดือน (ต้น+ดอก)
+	Balance    Money  // ยอดคงเหลือ (จ่าย lump-sum เพื่อปิด)
+	Collateral string // คำอธิบายหลักค้ำ ("ค้ำบ้าน") — "" ถ้าไม่มี
+	CollatKind string // "home"/"car"/"asset"/"" (ใช้เช็คการใช้หลักค้ำซ้ำ)
+	CollatRef  string // asset ID ถ้า CollatKind="asset"
+}
+
 // DealCard — การ์ดดีลจากช่อง Opportunity (เสนอให้ซื้อสินทรัพย์)
 type DealCard struct {
 	Title       string
@@ -182,6 +197,7 @@ type Player struct {
 	Profession  Profession
 	Assets      []Asset
 	Liabilities []Liability // หนี้สินที่เพิ่มระหว่างเกม (นอกเหนือจาก profession)
+	Loans       []Loan      // สินเชื่อที่ผู้เล่นกู้ระหว่างเกม
 	Position    int         // ตำแหน่งบนกระดาน (index ของช่อง)
 	OnFastTrack bool
 	Bankrupt    bool

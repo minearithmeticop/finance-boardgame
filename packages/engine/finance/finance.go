@@ -35,6 +35,9 @@ func Statement(p domain.Player) domain.FinancialStatement {
 	for _, l := range p.Liabilities {
 		fs.TotalExpenses += l.Payment
 	}
+	for _, ln := range p.Loans {
+		fs.TotalExpenses += ln.MonthlyPay
+	}
 
 	fs.MonthlyCashFlow = fs.TotalIncome - fs.TotalExpenses
 
@@ -50,6 +53,9 @@ func Statement(p domain.Player) domain.FinancialStatement {
 		p.Profession.CreditCard.Balance
 	for _, l := range p.Liabilities {
 		fs.TotalLiabilities += l.Balance
+	}
+	for _, ln := range p.Loans {
+		fs.TotalLiabilities += ln.Balance
 	}
 
 	return fs
@@ -77,4 +83,31 @@ func CanEscapeRatRace(p domain.Player) bool {
 func NetWorth(p domain.Player) domain.Money {
 	fs := Statement(p)
 	return fs.TotalAssets - fs.TotalLiabilities
+}
+
+// DebtService คืนค่าผ่อนหนี้รวมต่อเดือน (ผ่อน profession + Liabilities + ค่างวด Loans)
+// ใช้คำนวณ DSCR สำหรับคุณสมบัติสินเชื่อ
+func DebtService(p domain.Player) domain.Money {
+	ds := p.Profession.HomeMortgage.Payment +
+		p.Profession.SchoolLoan.Payment +
+		p.Profession.CarLoan.Payment +
+		p.Profession.CreditCard.Payment
+	for _, l := range p.Liabilities {
+		ds += l.Payment
+	}
+	for _, ln := range p.Loans {
+		ds += ln.MonthlyPay
+	}
+	return ds
+}
+
+// TotalIncome คืนรายได้รวมต่อเดือน (เงินเดือน + รายได้จากสินทรัพย์)
+func TotalIncome(p domain.Player) domain.Money {
+	inc := p.Profession.Salary
+	for _, a := range p.Assets {
+		if a.CashFlow > 0 {
+			inc += a.CashFlow
+		}
+	}
+	return inc
 }
