@@ -35,6 +35,12 @@ export default function RootLayout({
             >
               📚 คัมภีร์การเงิน
             </Link>
+            <Link
+              href="/play"
+              className="text-slate-300 transition hover:text-emerald-400"
+            >
+              🎮 เล่นเกม
+            </Link>
           </div>
         </nav>
         {children}
