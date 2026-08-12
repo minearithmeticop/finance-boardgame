@@ -31,6 +31,7 @@ apps/web/public/wasm/wasm_exec.js
 Thumbs.db
 .idea/
 .vscode/
+.zcode/
 *.swp
 
 # Logs
