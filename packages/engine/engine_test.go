@@ -5,6 +5,7 @@ import (
 
 	"github.com/finance-boardgame/engine/domain"
 	"github.com/finance-boardgame/engine/finance"
+	"github.com/finance-boardgame/engine/profession"
 	"github.com/finance-boardgame/engine/ratrace"
 )
 
@@ -160,5 +161,65 @@ func TestApply_GameEnded_ReturnsError(t *testing.T) {
 	_, err := e.Apply(domain.Action{PlayerID: "p1", Type: domain.ActionRoll})
 	if err == nil {
 		t.Error("expected error when game ended, got nil")
+	}
+}
+
+// TestNewWithRandomProfessions_CreatesValidPlayers — สุ่มอาชีพจริงให้ผู้เล่น count คน
+func TestNewWithRandomProfessions_CreatesValidPlayers(t *testing.T) {
+	e := NewWithRandomProfessions(42, 2)
+
+	all := profession.All()
+	names := map[string]bool{}
+	for _, p := range all {
+		names[p.Name] = true
+	}
+
+	state := e.State()
+	if len(state.Players) != 2 {
+		t.Fatalf("Players count = %d, want 2", len(state.Players))
+	}
+	for i, p := range state.Players {
+		if !names[p.Name] {
+			t.Errorf("player %d: %q is not a real profession", i, p.Name)
+		}
+		if p.Cash != p.Profession.Savings {
+			t.Errorf("player %d (%s): Cash %d != Savings %d", i, p.Name, p.Cash, p.Profession.Savings)
+		}
+		if p.Position != 0 {
+			t.Errorf("player %d: Position = %d, want 0", i, p.Position)
+		}
+	}
+}
+
+// TestStatement_ReturnsBreakdown — Statement คืน breakdown ตรงกับ profession
+func TestStatement_ReturnsBreakdown(t *testing.T) {
+	e := NewWithRandomProfessions(42, 3)
+
+	fs, err := e.Statement(0)
+	if err != nil {
+		t.Fatalf("Statement(0): %v", err)
+	}
+	p := e.State().Players[0]
+
+	if fs.Tax != p.Profession.Taxes {
+		t.Errorf("Tax = %d, want %d", fs.Tax, p.Profession.Taxes)
+	}
+	if fs.SocialSecurity != p.Profession.SocialSecurity {
+		t.Errorf("SocialSecurity = %d, want %d", fs.SocialSecurity, p.Profession.SocialSecurity)
+	}
+	// MonthlyCashFlow = เงินเดือน − (ภาษี + SS + other + ผ่อนหนี้ทั้งหมด)
+	payments := p.Profession.HomeMortgage.Payment + p.Profession.CarLoan.Payment +
+		p.Profession.CreditCard.Payment + p.Profession.SchoolLoan.Payment
+	want := p.Profession.Salary - fs.Tax - fs.SocialSecurity - p.Profession.OtherExpenses - payments
+	if fs.MonthlyCashFlow != want {
+		t.Errorf("MonthlyCashFlow = %d, want %d", fs.MonthlyCashFlow, want)
+	}
+}
+
+// TestStatement_OutOfRange — index เกินขอบเขต → error
+func TestStatement_OutOfRange(t *testing.T) {
+	e := NewWithRandomProfessions(42, 2)
+	if _, err := e.Statement(5); err == nil {
+		t.Error("expected error for out-of-range player index, got nil")
 	}
 }

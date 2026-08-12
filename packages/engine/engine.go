@@ -11,6 +11,7 @@ import (
 
 	"github.com/finance-boardgame/engine/domain"
 	"github.com/finance-boardgame/engine/finance"
+	"github.com/finance-boardgame/engine/profession"
 	"github.com/finance-boardgame/engine/ratrace"
 	"github.com/finance-boardgame/engine/rng"
 )
@@ -50,8 +51,37 @@ func New(cfg Config) *Engine {
 	}
 }
 
+// NewWithRandomProfessions สร้างเกมใหม่โดยสุ่ม "อาชีพจริง" ให้ผู้เล่น count คน
+// (สำหรับ "จบใหม่สุ่มอาชีพ") — เงินสดเริ่มต้นของแต่ละคน = เงินออมของอาชีพนั้น
+func NewWithRandomProfessions(seed int64, count int) *Engine {
+	if count < 1 {
+		count = 1
+	}
+	r := rng.New(seed)
+	players := make([]domain.Player, count)
+	for i := range players {
+		prof := profession.Random(r)
+		players[i] = domain.Player{
+			ID:         fmt.Sprintf("p%d", i+1),
+			Name:       prof.Name,
+			Cash:       prof.Savings,
+			Profession: prof,
+			Position:   0,
+		}
+	}
+	return New(Config{Seed: seed, Players: players})
+}
+
 // State คืนสำเนาสถานะเกมปัจจุบัน (snapshot)
 func (e *Engine) State() domain.GameState { return e.state }
+
+// Statement คืนงบการเงินเต็มรูปแบบ (Income Statement + Balance Sheet) ของผู้เล่น index ที่กำหนด
+func (e *Engine) Statement(idx int) (domain.FinancialStatement, error) {
+	if idx < 0 || idx >= len(e.state.Players) {
+		return domain.FinancialStatement{}, fmt.Errorf("engine: player index %d out of range", idx)
+	}
+	return finance.Statement(e.state.Players[idx]), nil
+}
 
 // Apply นำ action มาประมวลผลแล้วคืน events ที่เกิดขึ้น
 func (e *Engine) Apply(action domain.Action) ([]domain.Event, error) {
