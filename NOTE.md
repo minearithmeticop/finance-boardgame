@@ -84,6 +84,16 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - commits: `64a458c` (engine WASM API), `b9e5e91` (web client + /play)
 - ⚠️ **Tech debt (type mirroring)**: TS types/enum mirror Go ด้วยมือ (`lib/engine-wasm/types.ts`) เพราะ Go enum serialize เป็น int → เสี่ยง drift → **Slice ถัดไปควรทำ codegen** (NFR-006)
 
+### 🛠 Slice 2 — อาชีพจริง + ประกันสังคม + ภาษีขั้นบันได (Realism) ✅ ทำเสร็จ
+- **`payroll` package** (ใหม่): ประกันสังคม `min(salary×5%, 750)` + ภาษีขั้นบันได (Thai PIT *game-simplified* — ลดหย่อนส่วนบุคคล 60k + ค่าใช้จ่าย 50%(cap 100k) + SS; brackets 0/5/10/15/20/25/30/35%) — coverage **96.4%**
+- **`profession` package** (ใหม่): 8 อาชีพไทย (15k–200k) + `Random(rng)`; tax/SS คำนวณตอนสร้างอาชีพ (กัน drift ระหว่าง data กับ formula)
+- **`finance`**: Statement รวม SS เข้า `TotalExpenses` + กรอก breakdown `Tax`/`SocialSecurity`
+- **`domain`**: `Profession` + `SocialSecurity`, `FinancialStatement` + `Tax`/`SocialSecurity`
+- **teaching output จริง** (จาก test): `วิศวกร เงินเดือน 45,000 − ภาษี 1,216 − SS 750 − อื่นๆ 12,000 − ผ่อน 23,500 = สุทธิ 7,534/เดือน` → สอนว่า "เงินเดือนสูง ≠ อิสรภาพ ถ้ารายจ่ายสูงตาม"
+- commits: `1690872` (payroll), `93f805a` (profession), `7281279` (finance), `9d7c6b5` (web sync)
+- **นอกขอบเขต** (ตาม "focus system"): ยังไม่ wire อาชีพจริงเข้า `/play`, ไม่เก็บภาษี passive/portfolio, ไม่มี annual filing event, tax คำนวณตอนสร้างอาชีพ (dynamic = อนาคต)
+- **ถัดไป**: Slice 3 (Opportunity + การ์ดดีล → decision phase) หรือ wire อาชีพจริงเข้า `/play`
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
