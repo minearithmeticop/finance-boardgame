@@ -34,7 +34,9 @@ func main() {
 		return engine.Version // คืน string plain (back-compat กับ loader เดิม)
 	}))
 	g.Set("engineCreate", js.FuncOf(engineCreate))
+	g.Set("engineCreateWithRandomProfessions", js.FuncOf(engineCreateWithRandomProfessions))
 	g.Set("engineState", js.FuncOf(engineState))
+	g.Set("engineStatement", js.FuncOf(engineStatement))
 	g.Set("engineApply", js.FuncOf(engineApply))
 	g.Set("engineBoard", js.FuncOf(engineBoard))
 
@@ -93,6 +95,33 @@ func engineApply(this js.Value, args []js.Value) any {
 // engineBoard() → layout กระดาน Rat Race (จาก ratrace.DefaultBoard — single source)
 func engineBoard(this js.Value, args []js.Value) any {
 	return envelope(ratrace.DefaultBoard(), nil)
+}
+
+// engineCreateWithRandomProfessions(seed, count) → สร้างเกมด้วยอาชีพจริงสุ่มให้ count ผู้เล่น
+func engineCreateWithRandomProfessions(this js.Value, args []js.Value) any {
+	if len(args) < 2 {
+		return envelope(nil, errors.New("engineCreateWithRandomProfessions needs (seed, count)"))
+	}
+	seed := int64(args[0].Int())
+	count := args[1].Int()
+	mu.Lock()
+	current = engine.NewWithRandomProfessions(seed, count)
+	mu.Unlock()
+	return envelope(nil, nil)
+}
+
+// engineStatement(playerIndex) → งบการเงินเต็มรูปแบบของผู้เล่น index ที่กำหนด
+func engineStatement(this js.Value, args []js.Value) any {
+	if len(args) < 1 {
+		return envelope(nil, errors.New("engineStatement needs (playerIndex)"))
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if current == nil {
+		return envelope(nil, errors.New("no game created"))
+	}
+	fs, err := current.Statement(args[0].Int())
+	return envelope(fs, err)
 }
 
 // envelope ห่อ data+error เป็น JSON string ตาม protocol ของ boundary
