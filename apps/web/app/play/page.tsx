@@ -3,18 +3,19 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   applyAction,
-  createGame,
+  createGameWithRandomProfessions,
   engineVersion,
   getBoard,
   getGameState,
+  getStatement,
   loadEngineWasm,
 } from '@/lib/engine-wasm/wasm';
 import {
   ActionType,
   EventType,
   TileType,
+  type FinancialStatement,
   type GameState,
-  type Player,
   type Tile,
 } from '@/lib/engine-wasm/types';
 
@@ -46,33 +47,6 @@ function tileIcon(type?: number): string {
   return TILE_STYLE[type]?.icon ?? '·';
 }
 
-function makePlayer(id: string, name: string): Player {
-  const zeroLiability = { ID: '', Name: '', Payment: 0, Balance: 0 };
-  return {
-    ID: id,
-    Name: name,
-    IsAI: false,
-    Cash: 1000,
-    Profession: {
-      Name: 'Tester',
-      Salary: 2000,
-      Taxes: 0,
-      SocialSecurity: 0,
-      OtherExpenses: 0,
-      HomeMortgage: zeroLiability,
-      SchoolLoan: zeroLiability,
-      CarLoan: zeroLiability,
-      CreditCard: zeroLiability,
-      Savings: 0,
-    },
-    Assets: [],
-    Liabilities: [],
-    Position: 0,
-    OnFastTrack: false,
-    Bankrupt: false,
-  };
-}
-
 interface LogEntry {
   id: number;
   text: string;
@@ -84,6 +58,7 @@ export default function PlayPage() {
   const [status, setStatus] = useState('กำลังโหลด engine…');
   const [board, setBoard] = useState<Tile[]>([]);
   const [state, setState] = useState<GameState | null>(null);
+  const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [log, setLog] = useState<LogEntry[]>([]);
   const [rolling, setRolling] = useState(false);
   const logId = useRef(0);
@@ -112,13 +87,22 @@ export default function PlayPage() {
     setLog((l) => [{ id: logId.current, text }, ...l].slice(0, 8));
   }
 
+  // ดึง breakdown งบการเงินของทุกผู้เล่นจาก engine
+  function fetchStatements(n: number): FinancialStatement[] {
+    const out: FinancialStatement[] = [];
+    for (let i = 0; i < n; i++) out.push(getStatement(i));
+    return out;
+  }
+
   function startNewGame() {
     try {
       const seed = Math.floor(Math.random() * 1_000_000);
-      createGame(seed, [makePlayer('p1', 'ผู้เล่น 1'), makePlayer('p2', 'ผู้เล่น 2')]);
-      setState(getGameState());
+      createGameWithRandomProfessions(seed, 2);
+      const s = getGameState();
+      setState(s);
+      setStatements(fetchStatements(s.Players.length));
       setLog([]);
-      setStatus(`✅ เริ่มเกมใหม่ (seed ${seed}) — กดทอยเต๋า`);
+      setStatus(`✅ เริ่มเกมใหม่ (seed ${seed}) — ${s.Players.map((p) => p.Name).join(' vs ')}`);
     } catch (e) {
       setStatus(`❌ ${(e as Error).message}`);
     }
@@ -155,18 +139,19 @@ export default function PlayPage() {
   }
 
   const current = state ? state.Players[state.CurrentTurn] : null;
+  const currentStmt = state ? statements[state.CurrentTurn] : undefined;
   const ready = state !== null;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10">
       <header className="mb-6">
-        <h1 className="text-3xl font-bold text-emerald-400">🎮 เล่นเกม (Slice 1.5)</h1>
+        <h1 className="text-3xl font-bold text-emerald-400">🎮 เล่นเกม (Slice 1.5 + อาชีพจริง)</h1>
         <p className="mt-1 text-sm text-slate-400">
-          engine รันใน browser ผ่าน WASM — กดทอยเต๋าเพื่อเดินรอบกระดาน ผ่าน Payday แล้วรับเงินสด
+          ผู้เล่นถูกสุ่มอาชีพจริง (เงินเดือน/ภาษี/ประกันสังคม/หนี้) — กดทอยเต๋าเดินรอบกระดาน ผ่าน Payday แล้วรับเงินสดสุทธิ
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* ── กระดานจตุรัส ── */}
         <div className="relative mx-auto aspect-square w-full max-w-2xl">
           <div className="relative grid h-full w-full grid-cols-7 grid-rows-7 gap-1">
@@ -188,7 +173,7 @@ export default function PlayPage() {
             {/* center panel */}
             <div
               style={{ gridRow: '2 / span 5', gridColumn: '2 / span 5' }}
-              className="flex flex-col items-center justify-center gap-3 rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center"
+              className="flex flex-col items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/70 p-4 text-center"
             >
               <div className="text-sm font-semibold text-emerald-400">Finance Boardgame</div>
               {current ? (
@@ -198,7 +183,13 @@ export default function PlayPage() {
               ) : (
                 <div className="text-slate-500">…</div>
               )}
-              <div className="text-xs text-slate-400">รอบที่ {state?.Round ?? 0}</div>
+              {currentStmt && (
+                <div className="text-xs text-slate-400">
+                  สุทธิ/เดือน{' '}
+                  <b className="text-emerald-400">{currentStmt.MonthlyCashFlow.toLocaleString()}</b>{' '}
+                  · รอบที่ {state?.Round ?? 0}
+                </div>
+              )}
               <button
                 onClick={handleRoll}
                 disabled={!ready || rolling}
@@ -211,12 +202,12 @@ export default function PlayPage() {
                 disabled={rolling}
                 className="text-xs text-slate-400 underline-offset-2 transition hover:text-emerald-400 hover:underline disabled:opacity-40"
               >
-                เริ่มเกมใหม่
+                สุ่มอาชีพใหม่
               </button>
-              <p className="mt-1 text-xs text-slate-500">{status}</p>
+              <p className="mt-1 max-w-xs text-xs text-slate-500">{status}</p>
             </div>
 
-            {/* ── tokens (absolute, animate ตอน position เปลี่ยน) ── */}
+            {/* ── tokens ── */}
             {state?.Players.map((p, idx) => {
               const { r, c } = tileToGrid(p.Position);
               const onTile = state.Players.filter((q) => q.Position === p.Position);
@@ -243,22 +234,38 @@ export default function PlayPage() {
           </div>
         </div>
 
-        {/* ── ข้าง: สรุปผู้เล่น + event log ── */}
+        {/* ── ข้าง: งบการเงินผู้เล่น + event log ── */}
         <aside className="flex flex-col gap-4">
           <section className="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-            <h2 className="mb-2 text-sm font-semibold text-slate-300">ผู้เล่น</h2>
-            <ul className="space-y-2">
+            <h2 className="mb-3 text-sm font-semibold text-slate-300">ผู้เล่น & งบการเงิน</h2>
+            <ul className="space-y-3">
               {state?.Players.map((p, idx) => {
+                const fs = statements[idx];
                 const isCurrent = current?.ID === p.ID;
                 return (
                   <li
                     key={p.ID}
-                    className={`flex items-center gap-2 rounded p-2 text-sm ${isCurrent ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40' : ''}`}
+                    className={`rounded p-3 ${isCurrent ? 'bg-emerald-500/10 ring-1 ring-emerald-500/40' : 'bg-slate-900/40'}`}
                   >
-                    <span className={`h-3 w-3 rounded-full ${PLAYER_COLORS[idx % PLAYER_COLORS.length]}`} />
-                    <span className="flex-1 text-slate-200">{p.Name}</span>
-                    <span className="text-slate-400">ช่อง {p.Position}</span>
-                    <span className="font-mono text-emerald-400">{p.Cash.toLocaleString()}</span>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className={`h-3 w-3 shrink-0 rounded-full ${PLAYER_COLORS[idx % PLAYER_COLORS.length]}`} />
+                      <span className="font-semibold text-slate-100">{p.Name}</span>
+                      <span className="ml-auto font-mono text-emerald-400">
+                        {p.Cash.toLocaleString()}
+                      </span>
+                    </div>
+                    {fs && (
+                      <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-slate-400">
+                        <span>เงินเดือน <b className="text-slate-300">{fs.EarnedIncome.toLocaleString()}</b></span>
+                        <span>ภาษี <b className="text-slate-300">{fs.Tax.toLocaleString()}</b></span>
+                        <span>ประกันสังคม <b className="text-slate-300">{fs.SocialSecurity.toLocaleString()}</b></span>
+                        <span>รายจ่ายรวม <b className="text-slate-300">{fs.TotalExpenses.toLocaleString()}</b></span>
+                        <span className="col-span-2">
+                          สุทธิ/เดือน <b className="text-emerald-400">{fs.MonthlyCashFlow.toLocaleString()}</b>
+                          <span className="ml-2 text-slate-500">· ช่อง {p.Position}</span>
+                        </span>
+                      </div>
+                    )}
                   </li>
                 );
               })}

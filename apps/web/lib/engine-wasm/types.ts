@@ -67,6 +67,19 @@ export interface Tile {
   Name: string;
 }
 
+export interface FinancialStatement {
+  EarnedIncome: number;
+  PassiveIncome: number;
+  PortfolioIncome: number;
+  TotalIncome: number;
+  Tax: number;
+  SocialSecurity: number;
+  TotalExpenses: number;
+  MonthlyCashFlow: number;
+  TotalAssets: number;
+  TotalLiabilities: number;
+}
+
 // ── Enum const mirrors (ค่าตรงกับ iota ใน Go domain) ──────────────────────
 // อ้างอิง: packages/engine/domain/types.go
 

@@ -4,7 +4,7 @@
 // ไฟล์ WASM (engine.wasm + wasm_exec.js) generate โดย `pnpm build:wasm`
 // (tooling/build-wasm.sh) แล้ววางใน /public/wasm
 
-import type { Event, GameState, Tile } from './types';
+import type { Event, FinancialStatement, GameState, Tile } from './types';
 
 declare global {
   interface Window {
@@ -16,7 +16,9 @@ declare global {
     // engine API ที่ cmd/wasm/main.go ลงทะเบียนไว้
     engineVersion?: () => string;
     engineCreate?: (seed: number, playersJSON: string) => string;
+    engineCreateWithRandomProfessions?: (seed: number, count: number) => string;
     engineState?: () => string;
+    engineStatement?: (playerIndex: number) => string;
     engineApply?: (actionJSON: string) => string;
     engineBoard?: () => string;
     // flag "พร้อม" ที่ Go main ตั้งหลัง register ทุก callback
@@ -86,6 +88,16 @@ function call<T>(fn: ((...a: any[]) => string) | undefined, ...args: unknown[]):
 /** สร้างเกมใหม่ด้วย seed + รายชื่อผู้เล่น */
 export function createGame(seed: number, players: unknown[]): void {
   call<void>(window.engineCreate, seed, JSON.stringify(players));
+}
+
+/** สร้างเกมใหม่โดยสุ่ม "อาชีพจริง" ให้ count ผู้เล่น (จบใหม่สุ่มอาชีพ) */
+export function createGameWithRandomProfessions(seed: number, count: number): void {
+  call<void>(window.engineCreateWithRandomProfessions, seed, count);
+}
+
+/** ดึงงบการเงินเต็มรูปแบบ (breakdown) ของผู้เล่น index */
+export function getStatement(playerIndex: number): FinancialStatement {
+  return call<FinancialStatement>(window.engineStatement, playerIndex);
 }
 
 /** ดึง snapshot สถานะเกมปัจจุบัน */
