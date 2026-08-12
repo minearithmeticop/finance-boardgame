@@ -40,17 +40,23 @@ const (
 )
 
 // TileType — ประเภทช่องบนกระดาน (ใช้ร่วมระหว่าง Rat Race และ Fast Track)
+//
+// หัวใจของบทพลิกเศรษฐกิจในเกม = สามเสา:
+//   - Opportunity (โอกาส)  → บวก (ซื้อสินทรัพย์)
+//   - Shopping (ช้อป)       → ล่อใจ (ใช้จ่ายฟุ่มเฟือย)
+//   - Crisis (วิกฤต)         → ลบ (เหตุการณ์ร้าย)
 type TileType int
 
 const (
 	TilePayday TileType = iota
-	TileOpportunity
-	TileDoodad
-	TileMarket
-	TileDownsizing
-	TileBaby
-	TileCharity
-	TileBlank
+	TileOpportunity // 🃏 โอกาสลงทุน (บวก)
+	TileShopping    // 🛍️ ช้อป/ใช้จ่ายฟุ่มเฟือย (ล่อใจ)
+	TileCrisis      // ⚠️ วิกฤต (ลบ)
+	TileMarket      // 📈 เหตุการณ์ตลาด
+	TileDownsizing  // 📉 ตกงาน (ชนิดหนึ่งของวิกฤต)
+	TileBaby        // 👶 มีบุตร
+	TileCharity     // ❤️ การกุศล
+	TileBlank       // · ช่องว่าง
 )
 
 // Tile — ช่องหนึ่งช่องบนกระดาน
