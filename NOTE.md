@@ -101,6 +101,13 @@ User แชร์วิสัยทัศน์ที่ขยายจาก Ca
 - เขียนแหล่งอ้างอิง + methodology ไว้ใน `INFO.md` § "ข้อมูลรายได้อ้างอิง" (ให้ผู้เล่นตรวจสอบได้)
 - ผล: SS ตอนนี้ scale ตามเงินเดือนจริง (450–750) · ภาษีโผล่เฉพาะรายได้สูง · บทเรียนยังชัด: พนักงานทำความสะอาด (9k) สุทธิ 4,250 > โปรแกรมเมอร์ (35k) สุทธิ 1,830
 
+### 🎲 Tile taxonomy — เพิ่ม Crisis + เปลี่ยน Doodad→Shopping
+- User เตือน: "นอกจากโอกาสแล้วต้องมี **วิกฤต** + **ช้อป** ด้วย" → เพิ่ม `TileCrisis` และเปลี่ยน `TileDoodad → TileShopping`
+- หัวใจบทพลิกของเกม = สามเสา: **Opportunity (บวก) / Shopping (ล่อใจ) / Crisis (ลบ)**
+- ปรับ layout กระดานเป็น trio-dominant: Opp 8 / Shopping 5 / Crisis 4 + Payday 1 / Market 2 / Charity 2 / Baby 1 / Blank 1
+- glossary: เพิ่ม `Crisis` + เปลี่ยน `Doodad→Shopping`
+- ⚠️ หมายเหตุ: ตอนนี้เป็นแค่ "tile types + taxonomy" — **resolution logic** (การ์ดดีล / เหตุการณ์จริงตอนตกช่อง) จะทำใน **Slice 3**
+
 ### 📦 ผลลัพธ์ของ Session
 - อัปเดต `INFO.md` (Game Design Vision), `REQUIREMENT.md` (Proposed Evolution), ไฟล์นี้
 - สร้าง `apps/web/data/glossary.ts` + `apps/web/app/glossary/page.tsx` + nav ใน layout
