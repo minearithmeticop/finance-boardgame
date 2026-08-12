@@ -98,6 +98,14 @@ export interface PendingDecision {
   DealCard: DealCard;
 }
 
+// เหตุการณ์ในชีวิต (resolve = Cash += Amount) — แต่ละหมวดมี deck ของตัวเองใน engine
+export interface LifeEvent {
+  Category: string;
+  Title: string;
+  Detail: string;
+  Amount: number;
+}
+
 // ── Enum const mirrors (ค่าตรงกับ iota ใน Go domain) ──────────────────────
 // อ้างอิง: packages/engine/domain/types.go
 
@@ -142,7 +150,12 @@ export const TileType = {
   Crisis: 3,
   Market: 4,
   Downsizing: 5,
-  Baby: 6,
-  Charity: 7,
+  Family: 6,
+  Donate: 7,
   Blank: 8,
+  News: 9,
+  Windfall: 10,
+  SideJob: 11,
+  Learn: 12,
+  Health: 13,
 } as const;

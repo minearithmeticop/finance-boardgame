@@ -37,9 +37,20 @@ const TILE_STYLE: Record<number, { icon: string; cls: string }> = {
   [TileType.Crisis]: { icon: '⚠️', cls: 'border-red-500/60 bg-red-500/15' },
   [TileType.Market]: { icon: '📈', cls: 'border-violet-500/60 bg-violet-500/15' },
   [TileType.Downsizing]: { icon: '📉', cls: 'border-rose-500/60 bg-rose-500/15' },
-  [TileType.Baby]: { icon: '👶', cls: 'border-pink-500/60 bg-pink-500/15' },
-  [TileType.Charity]: { icon: '❤️', cls: 'border-red-400/60 bg-red-400/15' },
+  [TileType.Family]: { icon: '👨‍👩‍👧', cls: 'border-pink-500/60 bg-pink-500/15' },
+  [TileType.Donate]: { icon: '❤️', cls: 'border-rose-400/60 bg-rose-400/15' },
   [TileType.Blank]: { icon: '·', cls: 'border-slate-700 bg-slate-800/30' },
+  [TileType.News]: { icon: '📰', cls: 'border-slate-400/60 bg-slate-500/15' },
+  [TileType.Windfall]: { icon: '🎁', cls: 'border-teal-500/60 bg-teal-500/15' },
+  [TileType.SideJob]: { icon: '💼', cls: 'border-indigo-500/60 bg-indigo-500/15' },
+  [TileType.Learn]: { icon: '📚', cls: 'border-cyan-500/60 bg-cyan-500/15' },
+  [TileType.Health]: { icon: '🩺', cls: 'border-orange-500/60 bg-orange-500/15' },
+};
+
+// หมวด LifeEvent → ไอคอน/ป้าย สำหรับ event log
+const CATEGORY_LOG: Record<string, string> = {
+  news: '📰', windfall: '🎁', sidejob: '💼', shopping: '🛍️',
+  family: '👨‍👩‍👧', donate: '❤️', learn: '📚', health: '🩺', crisis: '⚠️',
 };
 
 const ASSET_LABEL: Record<number, string> = {
@@ -80,10 +91,15 @@ function logFromEvents(events: Event[], name: string, board: Tile[]): string {
         if (d.kind === 'opportunity') parts.push(`🃏 ดีล: ${d.title}`);
         else if (d.kind === 'declined') parts.push(`⏭️ ผ่าน: ${d.title}`);
         break;
-      case EventType.CashChanged:
-        if (d.kind === 'shopping') parts.push(`🛍️ ${d.title} ${Number(d.amount).toLocaleString()}`);
-        else if (d.kind === 'crisis') parts.push(`⚠️ ${d.title} ${Number(d.amount).toLocaleString()}`);
+      case EventType.CashChanged: {
+        const kind = String(d.kind ?? '');
+        const icon = CATEGORY_LOG[kind];
+        if (icon) {
+          const amt = Number(d.amount ?? 0);
+          parts.push(amt === 0 ? `${icon} ${d.title}` : `${icon} ${d.title} ${amt.toLocaleString()}`);
+        }
         break;
+      }
       case EventType.AssetBought:
         parts.push(`🏠 ซื้อ: ${d.title}`);
         break;
